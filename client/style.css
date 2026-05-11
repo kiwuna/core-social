@@ -178,8 +178,10 @@ body {
 }
 
 .post-foot { display: flex; align-items: center; gap: 32px; color: var(--muted); font-size: 14px; font-weight: 600; }
-.post-foot span { display: flex; align-items: center; gap: 8px; cursor: pointer; transition: color 0.2s; }
+.post-foot span { display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; }
 .post-foot span:hover { color: #fff; }
+.post-foot span.liked { color: #ff4444; }
+.post-foot span.liked:hover { color: #ff6666; }
 
 /* Right Rail - Minimalist */
 .News { 

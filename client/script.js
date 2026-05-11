@@ -142,7 +142,7 @@ function createPostElement(post) {
     <div class="post-body"></div>
     <img class="post-image hidden" alt="Post image" />
     <footer class="post-foot">
-      <span class="action-like" style="cursor:pointer">❤ <span class="likes-count">${post.likes || 0}</span></span>
+      <span class="action-like ${post.has_liked ? "liked" : ""}" style="cursor:pointer">❤ <span class="likes-count">${post.likes || 0}</span></span>
       <span>💬 0</span>
       <span>🔄 0</span>
       ${isOwner ? '<button class="action-delete" style="background:none; border:0; color:#444; cursor:pointer; font-size:12px; margin-left:auto;">Delete</button>' : ""}
@@ -383,6 +383,7 @@ document.addEventListener("click", async (event) => {
         const data = await res.json();
         const count = postElement.querySelector(".likes-count");
         if (count) count.textContent = data.likes;
+        likeBtn.classList.add("liked");
         showFeedback("Liked!", "success");
       } else {
         const err = await res.json();

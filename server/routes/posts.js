@@ -35,19 +35,20 @@ const upload = multer({
 // Get all posts
 router.get("/", (req, res, next) => {
   const db = req.app.locals.db;
-  // Join with users to get the creator's emoji. 
-  // Use COALESCE for legacy posts without a user_id.
+  const currentUserId = req.session.userId || 0;
+  
   const query = `
     SELECT 
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
       COALESCE(u.emoji, '👻') as emoji,
-      COALESCE(u.username, 'anonymous') as username
+      COALESCE(u.username, 'anonymous') as username,
+      EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     ORDER BY p.id DESC
   `;
 
-  db.all(query, [], (error, rows) => {
+  db.all(query, [currentUserId], (error, rows) => {
     if (error) return next(error);
     res.json(rows);
   });
@@ -57,18 +58,21 @@ router.get("/", (req, res, next) => {
 router.get("/user/:userId", (req, res, next) => {
   const db = req.app.locals.db;
   const userId = req.params.userId;
+  const currentUserId = req.session.userId || 0;
+
   const query = `
     SELECT 
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
       COALESCE(u.emoji, '👻') as emoji,
-      COALESCE(u.username, 'anonymous') as username
+      COALESCE(u.username, 'anonymous') as username,
+      EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     WHERE p.user_id = ?
     ORDER BY p.id DESC
   `;
 
-  db.all(query, [userId], (error, rows) => {
+  db.all(query, [currentUserId, userId], (error, rows) => {
     if (error) return next(error);
     res.json(rows);
   });

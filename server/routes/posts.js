@@ -42,7 +42,8 @@ router.get("/", (req, res, next) => {
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
       COALESCE(u.emoji, '👻') as emoji,
       COALESCE(u.username, 'anonymous') as username,
-      EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked
+      EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked,
+      (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     ORDER BY p.id DESC
@@ -65,7 +66,8 @@ router.get("/user/:userId", (req, res, next) => {
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
       COALESCE(u.emoji, '👻') as emoji,
       COALESCE(u.username, 'anonymous') as username,
-      EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked
+      EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked,
+      (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     WHERE p.user_id = ?
@@ -176,6 +178,47 @@ router.delete("/:id", isAuthenticated, (req, res, next) => {
       }
 
       res.json({ message: "Post deleted." });
+    });
+  });
+});
+
+// Get comments for a post
+router.get("/:id/comments", (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+
+  const query = `
+    SELECT 
+      c.id, c.content, c.created_at, c.user_id,
+      u.username, u.emoji
+    FROM comments c
+    JOIN users u ON c.user_id = u.id
+    WHERE c.post_id = ?
+    ORDER BY c.created_at ASC
+  `;
+
+  db.all(query, [postId], (err, rows) => {
+    if (err) return next(err);
+    res.json(rows);
+  });
+});
+
+// Add a comment (Protected)
+router.post("/:id/comments", isAuthenticated, (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+  const userId = req.session.userId;
+  const content = typeof req.body?.content === "string" ? req.body.content.trim() : "";
+
+  if (!content) return res.status(400).json({ error: "Comment cannot be empty." });
+
+  const query = `INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)`;
+  db.run(query, [postId, userId, content], function(err) {
+    if (err) return next(err);
+    
+    db.get(`SELECT c.*, u.username, u.emoji FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?`, [this.lastID], (getErr, row) => {
+      if (getErr) return next(getErr);
+      res.status(201).json(row);
     });
   });
 });

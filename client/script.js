@@ -1,5 +1,12 @@
 const API_URL = ""; 
 
+function formatNumber(num) {
+  if (!num) return "0";
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+  return num.toString();
+}
+
 const postForm = document.getElementById("postForm");
 const postInput = document.getElementById("postInput");
 const postsList = document.getElementById("feedPosts");
@@ -142,11 +149,12 @@ function createPostElement(post) {
     <div class="post-body"></div>
     <img class="post-image hidden" alt="Post image" />
     <footer class="post-foot">
-      <span class="action-like ${post.has_liked ? "liked" : ""}" style="cursor:pointer">❤ <span class="likes-count">${post.likes || 0}</span></span>
-      <span>💬 0</span>
+      <span class="action-like ${post.has_liked ? "liked" : ""}" style="cursor:pointer">❤ <span class="likes-count">${formatNumber(post.likes || 0)}</span></span>
+      <span class="action-comment" style="cursor:pointer">💬 <span class="comments-count">${formatNumber(post.comment_count || 0)}</span></span>
       <span>🔄 0</span>
       ${isOwner ? '<button class="action-delete" style="background:none; border:0; color:#444; cursor:pointer; font-size:12px; margin-left:auto;">Delete</button>' : ""}
     </footer>
+    <div class="comments-container hidden"></div>
   `;
 
   // Go to profile on avatar/name click
@@ -365,12 +373,13 @@ imageModal.addEventListener("click", (e) => {
 // Global Event for Post Actions
 document.addEventListener("click", async (event) => {
   const likeBtn = event.target.closest(".action-like");
+  const commentBtn = event.target.closest(".action-comment");
   const deleteButton = event.target.closest(".action-delete");
   const postElement = event.target.closest(".post");
   
   if (!postElement) return;
   const postId = postElement.dataset.postId;
-
+ 
   // HANDLE LIKES
   if (likeBtn) {
     if (!currentUser) { window.location.href = "login.html"; return; }
@@ -382,7 +391,7 @@ document.addEventListener("click", async (event) => {
       if (res.ok) {
         const data = await res.json();
         const count = postElement.querySelector(".likes-count");
-        if (count) count.textContent = data.likes;
+        if (count) count.textContent = formatNumber(data.likes);
         likeBtn.classList.add("liked");
         showFeedback("Liked!", "success");
       } else {
@@ -394,6 +403,12 @@ document.addEventListener("click", async (event) => {
     } finally {
       pendingPostActions.delete(`like-${postId}`);
     }
+    return;
+  }
+
+  // HANDLE COMMENTS TOGGLE
+  if (commentBtn) {
+    toggleComments(postId, postElement);
     return;
   }
 
@@ -426,29 +441,111 @@ document.addEventListener("click", async (event) => {
 });
 
 // Sticky Header Scroll Logic
-const feedTabs = document.querySelector(".feed-tabs-container");
-const composerBox = document.querySelector(".composer");
+const stickyHeader = document.getElementById("stickyHeader");
 let lastScrollTop = 0;
+
+let isHeaderHidden = false;
 
 function handleScroll(e) {
   const st = e.target.scrollTop;
-  if (!feedTabs) return;
+  if (!stickyHeader) return;
 
-  if (st > lastScrollTop && st > 100) {
-    // Scrolling down
-    feedTabs.classList.add("hidden");
-    if (composerBox) composerBox.style.opacity = "0.5";
-  } else {
-    // Scrolling up
-    feedTabs.classList.remove("hidden");
-    if (composerBox) composerBox.style.opacity = "1";
+  // Decision threshold
+  if (st > lastScrollTop && st > 150 && !isHeaderHidden) {
+    stickyHeader.classList.add("hidden");
+    isHeaderHidden = true;
+  } else if (st < lastScrollTop && isHeaderHidden) {
+    stickyHeader.classList.remove("hidden");
+    isHeaderHidden = false;
   }
-  lastScrollTop = st <= 0 ? 0 : st;
+  
+  lastScrollTop = st;
 }
 
-const feedScrollArea = document.getElementById("postsList");
+const feedScrollArea = document.getElementById("feedScrollArea");
 if (feedScrollArea) {
   feedScrollArea.addEventListener("scroll", handleScroll);
+}
+
+async function toggleComments(postId, postElement) {
+  const container = postElement.querySelector(".comments-container");
+  if (!container) return;
+
+  if (!container.classList.contains("hidden")) {
+    container.classList.add("hidden");
+    container.innerHTML = "";
+    return;
+  }
+
+  container.classList.remove("hidden");
+  container.innerHTML = `<div style="padding: 10px; color: var(--muted); font-size: 13px;">Loading thoughts...</div>`;
+
+  try {
+    const res = await fetch(`${API_URL}/posts/${postId}/comments`);
+    const comments = await res.json();
+    
+    let html = `<div class="comments-section">`;
+    comments.forEach(c => {
+      html += `
+        <div class="comment">
+          <div class="mini-avatar">${c.emoji}</div>
+          <div class="comment-bubble">
+            <span class="author">${c.username}</span>
+            <div class="text">${c.content}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    if (currentUser) {
+      html += `
+        <form class="comment-form" data-post-id="${postId}">
+          <input type="text" placeholder="Add your thought..." required />
+          <button type="submit" class="btn-send-comment">➜</button>
+        </form>
+      `;
+    } else {
+      html += `<p style="font-size: 12px; color: var(--muted); margin-top: 8px;">Login to join the conversation.</p>`;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+
+    // Handle comment submission
+    const form = container.querySelector(".comment-form");
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const input = form.querySelector("input");
+        const content = input.value.trim();
+        if (!content) return;
+
+        try {
+          const postRes = await fetch(`${API_URL}/posts/${postId}/comments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content })
+          });
+          if (postRes.ok) {
+            input.value = "";
+            toggleComments(postId, postElement); // Refresh comments
+            // Update count
+            const countEl = postElement.querySelector(".comments-count");
+            if (countEl) {
+              const currentText = countEl.textContent.replace(/[^0-9]/g, "");
+              const current = parseInt(currentText) || 0;
+              countEl.textContent = formatNumber(current + 1);
+            }
+          }
+        } catch (err) {
+          showFeedback("Failed to post comment", "error");
+        }
+      });
+    }
+
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 10px; color: #f87171;">Failed to load comments.</div>`;
+  }
 }
 
 (async function init() {

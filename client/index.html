@@ -41,52 +41,59 @@
     <div id="contentArea" style="display: contents;">
       
       <!-- Main Feed -->
-      <section id="feedView" class="feed">
-        <div class="feed-tabs-container">
-          <div class="tabs">
-            <button class="tab active">For you</button>
-            <button class="tab">Clans</button>
-            <button class="tab">Following</button>
+      <section id="feedView" class="feed" style="position: relative;">
+        
+        <!-- FIXED HEADER (Outside Scroll Container) -->
+        <div id="stickyHeader" class="sticky-header">
+          <div class="feed-tabs-container">
+            <div class="tabs">
+              <button class="tab active">For you</button>
+              <button class="tab">Clans</button>
+              <button class="tab">Following</button>
+            </div>
+          </div>
+
+          <!-- Composer -->
+          <div class="composer-container">
+            <form id="postForm" class="composer" autocomplete="off">
+              <div class="composer-top">
+                <span id="userEmojiMini" class="mini-avatar">👻</span>
+                <input
+                  id="postInput"
+                  type="text"
+                  placeholder="What's on your mind?"
+                  maxlength="300"
+                  required
+                  autocomplete="off"
+                />
+              </div>
+              
+              <div class="composer-bottom">
+                <div class="composer-tools">
+                  <span id="pickImageButton">📎</span>
+                  <span>😊</span>
+                  <span>🎨</span>
+                  <span>📊</span>
+                </div>
+                <input id="imageInput" type="file" accept="image/*" hidden />
+                <button type="submit" class="send">Post</button>
+              </div>
+
+              <div id="imagePreviewBox" class="image-preview-box hidden" style="margin-top: 15px;">
+                <img id="imagePreview" alt="Preview" style="max-width: 100px; border-radius: 12px;" />
+                <button id="removeImageButton" type="button" style="background: none; border: 0; color: #888; cursor: pointer;">Remove</button>
+              </div>
+            </form>
           </div>
         </div>
 
-        <div id="postsList" class="feed-content" style="padding-bottom: 0;">
-          <!-- Composer -->
-          <form id="postForm" class="composer" autocomplete="off">
-            <div class="composer-top">
-               <span id="userEmojiMini" class="mini-avatar">👻</span>
-               <input
-                 id="postInput"
-                 type="text"
-                 placeholder="What's on your mind?"
-                 maxlength="300"
-                 required
-                 autocomplete="off"
-               />
-            </div>
-            
-            <div class="composer-bottom">
-              <div class="composer-tools">
-                <span id="pickImageButton">📎</span>
-                <span>😊</span>
-                <span>🎨</span>
-                <span>📊</span>
-              </div>
-              <input id="imageInput" type="file" accept="image/*" hidden />
-              <button type="submit" class="send">Post</button>
-            </div>
-
-            <div id="imagePreviewBox" class="image-preview-box hidden" style="margin-top: 15px;">
-              <img id="imagePreview" alt="Preview" style="max-width: 100px; border-radius: 12px;" />
-              <button id="removeImageButton" type="button" style="background: none; border: 0; color: #888; cursor: pointer;">Remove</button>
-            </div>
-          </form>
-
-          <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
+        <div id="feedScrollArea" class="feed-content" style="padding-top: 220px;">
+          <!-- Feed Posts Wrapper -->
+          <div class="feed-posts-wrapper" style="padding-top: 0;">
+            <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
+            <div id="feedPosts" style="display: flex; flex-direction: column; gap: 12px;"></div>
+          </div>
         </div>
-
-        <!-- Feed Posts Container -->
-        <div id="feedPosts" class="feed-content" style="padding-top: 0; flex: 1; min-height: 0;"></div>
       </section>
 
       <!-- Profile View -->

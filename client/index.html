@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Core — Feeds</title>
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <main class="dashboard">
+    <aside class="sidebar">
+      <div class="profile">
+        <div class="avatar-stack">
+          <div class="avatar avatar-art" aria-hidden="true">
+            <svg viewBox="0 0 80 80"><defs><radialGradient id="g" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ff6bcb"/><stop offset="50%" stop-color="#7c5cff"/><stop offset="100%" stop-color="#39d2ff"/></radialGradient></defs><circle cx="40" cy="40" r="36" fill="url(#g)"/><circle cx="55" cy="30" r="6" fill="#fff" opacity=".7"/></svg>
+          </div>
+          <div class="avatar avatar-photo">
+            <img src="https://i.pravatar.cc/150?img=12" alt="Core user" />
+          </div>
+        </div>
+        <h2>Core User</h2>
+        <p class="handle">@anonymous</p>
+      </div>
+
+      <nav class="nav">
+        <a class="nav-item active" href="#"><span class="ico">⌂</span> News Feed</a>
+        <a class="nav-item" href="#"><span class="ico">✉</span> Messages <span class="badge">6</span></a>
+        <a class="nav-item" href="#"><span class="ico">◍</span> Forums</a>
+        <a class="nav-item" href="#"><span class="ico">◉</span> Friends <span class="badge">3</span></a>
+        <a class="nav-item" href="#"><span class="ico">▣</span> Media</a>
+        <a class="nav-item" href="#"><span class="ico">⚙</span> Settings</a>
+      </nav>
+    </aside>
+
+    <section class="feed">
+      <header class="feed-head">
+        <h1>Feeds</h1>
+        <div class="tabs">
+          <button class="tab">Recents</button>
+          <button class="tab active">Friends</button>
+          <button class="tab">Popular</button>
+        </div>
+      </header>
+
+      <form id="postForm" class="composer" autocomplete="off">
+        <img class="mini-avatar" src="https://i.pravatar.cc/100?img=12" alt="" />
+        <input
+          id="postInput"
+          type="text"
+          name="corePostInput"
+          placeholder="Share something"
+          maxlength="300"
+          required
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+        <button type="button" class="emoji">◌</button>
+        <input id="imageInput" type="file" accept="image/*" hidden />
+        <div class="composer-row">
+          <button type="button">⌗ File</button>
+          <button id="pickImageButton" type="button">▦ Image</button>
+          <button type="button">⌖ Location</button>
+          <button type="button">◎ Public ▾</button>
+          <button type="submit" class="send">Send</button>
+        </div>
+        <div id="imagePreviewBox" class="image-preview-box hidden">
+          <img id="imagePreview" class="image-preview" alt="Selected preview" />
+          <button id="removeImageButton" type="button" class="remove-image">Remove image</button>
+        </div>
+      </form>
+      <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
+
+      <div id="postsList" class="posts-list"></div>
+    </section>
+
+    <aside class="rail">
+      <section>
+        <h2>Stories</h2>
+        <div class="stories">
+          <div class="story">
+            <img src="https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=400&auto=format&fit=crop" alt="" />
+            <div class="story-foot"><img src="https://i.pravatar.cc/40?img=20" alt=""/><span>Anatoly Pr…</span></div>
+          </div>
+          <div class="story">
+            <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=400&auto=format&fit=crop" alt="" />
+            <div class="story-foot"><img src="https://i.pravatar.cc/40?img=44" alt=""/><span>Lolita Earns</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Suggestions</h2>
+        <ul class="suggestions">
+          <li><img src="https://i.pravatar.cc/80?img=13" alt=""/><span>Nick<br/>Shelburne</span><button>Follow</button></li>
+          <li><img src="https://i.pravatar.cc/80?img=49" alt=""/><span>Brittni<br/>Lando</span><button>Follow</button></li>
+          <li><img src="https://i.pravatar.cc/80?img=51" alt=""/><span>Ivan<br/>Shevchenko</span><button>Follow</button></li>
+        </ul>
+        <a class="seeall" href="#">See all</a>
+      </section>
+
+      <section>
+        <h2>Recommendations</h2>
+        <div class="recs">
+          <div class="rec rec-blue"><span>◇</span><b>UI/UX</b></div>
+          <div class="rec rec-pink"><span>♫</span><b>Music</b></div>
+          <div class="rec rec-cream"><span>◔</span><b>Cooking</b></div>
+          <div class="rec rec-purple"><span>△</span><b>Hiking</b></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>

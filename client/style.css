@@ -95,23 +95,34 @@ body {
 }
 
 .feed-tabs-container {
-  padding: 0 40px 24px;
+  padding: 24px 80px;
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 100;
   display: flex;
   justify-content: center;
+  transition: transform 0.3s ease, padding 0.3s ease;
+}
+
+.feed-tabs-container.hidden {
+  transform: translateY(-100%);
 }
 
 .tabs { 
-  display: flex; gap: 8px; 
-  background: var(--panel); 
-  padding: 6px; border-radius: 20px;
+  display: flex; gap: 4px; 
+  background: var(--glass-bg); 
+  backdrop-filter: blur(10px);
+  padding: 4px; border-radius: 20px;
+  border: 1px solid var(--panel-border);
 }
 .tab { 
   background: none; border: 0; cursor: pointer; 
-  padding: 10px 28px; border-radius: 16px;
-  font-size: 14px; color: var(--muted); font-weight: 600; 
+  padding: 8px 24px; border-radius: 16px;
+  font-size: 13px; color: var(--muted); font-weight: 600; 
   transition: all 0.2s;
 }
-.tab.active { background: #333; color: #fff; }
+.tab.active { background: #fff; color: #000; }
 
 .feed-content {
   flex: 1;
@@ -119,28 +130,32 @@ body {
   padding: 0 80px 40px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* Composer - Modern Liquid Box */
 .composer {
   background: var(--panel);
-  padding: 24px;
+  padding: 20px 24px;
   border-radius: var(--radius-xl);
-  display: flex; flex-direction: column; gap: 16px;
-  margin-bottom: 24px;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
 }
 
-.composer-top { display: flex; gap: 16px; align-items: flex-start; }
-.composer .mini-avatar { width: 44px; height: 44px; border-radius: 50%; background: #222; flex-shrink: 0; }
+.composer-top { display: flex; gap: 16px; align-items: center; }
+.composer .mini-avatar { 
+  width: 40px; height: 40px; border-radius: 50%; background: #222; 
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
 .composer input { 
   flex: 1; background: transparent; border: 0; color: #fff; 
-  font-size: 18px; outline: none; padding-top: 10px;
+  font-size: 16px; outline: none; padding: 0;
 }
 
 .composer-bottom {
   display: flex; align-items: center; gap: 20px;
-  padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.05);
+  padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05);
 }
 .composer-tools { display: flex; gap: 16px; color: var(--muted); font-size: 18px; }
 .composer-tools span { cursor: pointer; transition: color 0.2s; }

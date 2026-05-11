@@ -425,6 +425,32 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+// Sticky Header Scroll Logic
+const feedTabs = document.querySelector(".feed-tabs-container");
+const composerBox = document.querySelector(".composer");
+let lastScrollTop = 0;
+
+function handleScroll(e) {
+  const st = e.target.scrollTop;
+  if (!feedTabs) return;
+
+  if (st > lastScrollTop && st > 100) {
+    // Scrolling down
+    feedTabs.classList.add("hidden");
+    if (composerBox) composerBox.style.opacity = "0.5";
+  } else {
+    // Scrolling up
+    feedTabs.classList.remove("hidden");
+    if (composerBox) composerBox.style.opacity = "1";
+  }
+  lastScrollTop = st <= 0 ? 0 : st;
+}
+
+const feedScrollArea = document.getElementById("postsList");
+if (feedScrollArea) {
+  feedScrollArea.addEventListener("scroll", handleScroll);
+}
+
 (async function init() {
   await fetchCurrentUser();
   await loadFeed();

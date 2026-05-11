@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Core</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <header>
+            <h1 class="logo">Core</h1>
+            <p class="subtitle">Join the anonymous collective.</p>
+        </header>
+
+        <form id="signup-form" class="auth-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Choose a handle..." required autofocus>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Keep it secret..." required>
+            </div>
+
+            <div class="form-group">
+                <label>Choose your Identity</label>
+                <div class="emoji-picker" id="emoji-picker">
+                    <button type="button" class="emoji-option selected" data-emoji="👻">👻</button>
+                    <button type="button" class="emoji-option" data-emoji="👽">👽</button>
+                    <button type="button" class="emoji-option" data-emoji="🤖">🤖</button>
+                    <button type="button" class="emoji-option" data-emoji="🦊">🦊</button>
+                    <button type="button" class="emoji-option" data-emoji="🐸">🐸</button>
+                    <button type="button" class="emoji-option" data-emoji="🍄">🍄</button>
+                    <button type="button" class="emoji-option" data-emoji="🌑">🌑</button>
+                    <button type="button" class="emoji-option" data-emoji="⚡">⚡</button>
+                </div>
+                <input type="hidden" id="selected-emoji" value="👻">
+            </div>
+
+            <button type="submit" class="primary-btn">Create Account</button>
+        </form>
+
+        <footer class="auth-footer">
+            <p>Already have an account? <a href="login.html">Login</a></p>
+        </footer>
+    </div>
+
+    <div id="feedback-container"></div>
+
+    <script>
+        const emojiOptions = document.querySelectorAll('.emoji-option');
+        const emojiInput = document.getElementById('selected-emoji');
+        const feedbackContainer = document.getElementById('feedback-container');
+
+        emojiOptions.forEach(btn => {
+            btn.addEventListener('click', () => {
+                emojiOptions.forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                emojiInput.value = btn.dataset.emoji;
+            });
+        });
+
+        function showFeedback(message, type = 'success') {
+            const feedback = document.createElement('div');
+            feedback.className = `feedback-message ${type}`;
+            feedback.textContent = message;
+            feedbackContainer.appendChild(feedback);
+            setTimeout(() => feedback.classList.add('show'), 10);
+            setTimeout(() => {
+                feedback.classList.remove('show');
+                setTimeout(() => feedback.remove(), 300);
+            }, 3000);
+        }
+
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Safety check for beginners
+            if (window.location.protocol === 'file:') {
+                showFeedback('Error: Open this through http://localhost:3000, not as a file!', 'error');
+                return;
+            }
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const emoji = emojiInput.value;
+
+            try {
+                const res = await fetch('/auth/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, emoji })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showFeedback('Account created! Entering Core...');
+                    setTimeout(() => window.location.href = '/', 1500);
+                } else {
+                    showFeedback(data.error || 'Signup failed', 'error');
+                }
+            } catch (err) {
+                console.error('Signup error:', err);
+                showFeedback('Connection error: Is the server running?', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

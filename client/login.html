@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Core</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <header>
+            <h1 class="logo">Core</h1>
+            <p class="subtitle">Welcome back to the underground.</p>
+        </header>
+
+        <form id="login-form" class="auth-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Your handle..." required autofocus>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Your secret..." required>
+            </div>
+
+            <button type="submit" class="primary-btn">Login</button>
+        </form>
+
+        <footer class="auth-footer">
+            <p>New here? <a href="signup.html">Create an account</a></p>
+        </footer>
+    </div>
+
+    <div id="feedback-container"></div>
+
+    <script>
+        const feedbackContainer = document.getElementById('feedback-container');
+
+        function showFeedback(message, type = 'success') {
+            const feedback = document.createElement('div');
+            feedback.className = `feedback-message ${type}`;
+            feedback.textContent = message;
+            feedbackContainer.appendChild(feedback);
+            setTimeout(() => feedback.classList.add('show'), 10);
+            setTimeout(() => {
+                feedback.classList.remove('show');
+                setTimeout(() => feedback.remove(), 300);
+            }, 3000);
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Safety check for beginners
+            if (window.location.protocol === 'file:') {
+                showFeedback('Error: Open this through http://localhost:3000, not as a file!', 'error');
+                return;
+            }
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showFeedback('Welcome back.');
+                    setTimeout(() => window.location.href = '/', 1000);
+                } else {
+                    showFeedback(data.error || 'Login failed', 'error');
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                showFeedback('Connection error: Is the server running?', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

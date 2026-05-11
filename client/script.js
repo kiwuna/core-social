@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000";
+const API_URL = ""; // Relative URL for same-origin
 
 const postForm = document.getElementById("postForm");
 const postInput = document.getElementById("postInput");
@@ -11,7 +11,16 @@ const imagePreviewBox = document.getElementById("imagePreviewBox");
 const imagePreview = document.getElementById("imagePreview");
 const removeImageButton = document.getElementById("removeImageButton");
 
+// Auth UI Elements
+const userNameDisplay = document.getElementById("userNameDisplay");
+const userHandleDisplay = document.getElementById("userHandleDisplay");
+const userEmojiLarge = document.getElementById("userEmojiLarge");
+const userEmojiMini = document.getElementById("userEmojiMini");
+const logoutBtn = document.getElementById("logoutBtn");
+const loginLink = document.getElementById("loginLink");
+
 let isPosting = false;
+let currentUser = null;
 const pendingPostActions = new Set();
 let selectedImageFile = null;
 let selectedImagePreviewUrl = "";
@@ -38,11 +47,13 @@ function setPostFormState(loading) {
   sendButton.textContent = loading ? "Sending..." : "Send";
 }
 
-function getErrorMessage(response, fallbackMessage) {
-  return response
-    .json()
-    .then((data) => data.error || fallbackMessage)
-    .catch(() => fallbackMessage);
+async function getErrorMessage(response, fallbackMessage) {
+  try {
+    const data = await response.json();
+    return data.error || fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
 }
 
 function updateImagePreview(file) {
@@ -62,6 +73,40 @@ function updateImagePreview(file) {
   imagePreviewBox.classList.remove("hidden");
 }
 
+function updateAuthUI() {
+  if (currentUser) {
+    userNameDisplay.textContent = currentUser.username;
+    userHandleDisplay.textContent = `@${currentUser.username.toLowerCase()}`;
+    userEmojiLarge.textContent = currentUser.emoji;
+    userEmojiMini.textContent = currentUser.emoji;
+    logoutBtn.classList.remove("hidden");
+    loginLink.classList.add("hidden");
+  } else {
+    userNameDisplay.textContent = "Guest";
+    userHandleDisplay.textContent = "@anonymous";
+    userEmojiLarge.textContent = "👻";
+    userEmojiMini.textContent = "👻";
+    logoutBtn.classList.add("hidden");
+    loginLink.classList.remove("hidden");
+  }
+}
+
+async function fetchCurrentUser() {
+  try {
+    const res = await fetch("/auth/me");
+    if (res.ok) {
+      const data = await res.json();
+      currentUser = data.user;
+    } else {
+      currentUser = null;
+    }
+    updateAuthUI();
+  } catch (err) {
+    currentUser = null;
+    updateAuthUI();
+  }
+}
+
 function createPostElement(post) {
   const postElement = document.createElement("article");
   postElement.className = "post";
@@ -71,11 +116,18 @@ function createPostElement(post) {
     ? new Date(post.created_at).toLocaleString()
     : "Just now";
 
+  // Use the emoji from the post data (joined from users table)
+  const displayEmoji = post.emoji || "👻";
+  const displayUser = post.username || "anonymous";
+
+  // Only show delete button if the user owns the post
+  const isOwner = currentUser && post.user_id === currentUser.id;
+
   postElement.innerHTML = `
     <div class="post-head">
-      <img class="mini-avatar" src="https://i.pravatar.cc/100?img=15" alt="" />
+      <div class="mini-avatar" style="font-size: 24px; display: flex; align-items: center; justify-content: center; background: #1c2432; border: 1px solid #273149;">${displayEmoji}</div>
       <div>
-        <h3>Anonymous</h3>
+        <h3>${displayUser}</h3>
         <span class="meta">${createdAt}</span>
       </div>
       <button class="more" type="button">⋯</button>
@@ -86,7 +138,7 @@ function createPostElement(post) {
       <button class="action action-like stat-like" type="button" aria-label="Like post">
         ♥ <span class="likes-count">${post.likes || 0}</span>
       </button>
-      <button class="action action-delete" type="button">Delete</button>
+      ${isOwner ? '<button class="action action-delete" type="button">Delete</button>' : ""}
     </footer>
   `;
 
@@ -132,6 +184,12 @@ async function loadPosts() {
 
 postForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  if (!currentUser) {
+    window.location.href = "login.html";
+    return;
+  }
+
   if (isPosting) return;
 
   const content = postInput.value.trim();
@@ -153,6 +211,11 @@ postForm.addEventListener("submit", async (event) => {
       method: "POST",
       body: formData
     });
+
+    if (response.status === 401) {
+      window.location.href = "login.html";
+      return;
+    }
 
     if (!response.ok) {
       const message = await getErrorMessage(response, "Could not save post.");
@@ -202,6 +265,17 @@ removeImageButton.addEventListener("click", () => {
   updateImagePreview(null);
 });
 
+logoutBtn.addEventListener("click", async () => {
+  try {
+    const res = await fetch("/auth/logout", { method: "POST" });
+    if (res.ok) {
+      window.location.reload();
+    }
+  } catch (err) {
+    showFeedback("Logout failed", "error");
+  }
+});
+
 postsList.addEventListener("click", async (event) => {
   const likeButton = event.target.closest(".action-like");
   const deleteButton = event.target.closest(".action-delete");
@@ -212,6 +286,11 @@ postsList.addEventListener("click", async (event) => {
   if (!postId) return;
 
   if (likeButton) {
+    if (!currentUser) {
+      window.location.href = "login.html";
+      return;
+    }
+
     if (pendingPostActions.has(`like-${postId}`)) return;
     pendingPostActions.add(`like-${postId}`);
     likeButton.disabled = true;
@@ -220,6 +299,11 @@ postsList.addEventListener("click", async (event) => {
       const response = await fetch(`${API_URL}/posts/${postId}/like`, {
         method: "POST"
       });
+
+      if (response.status === 401) {
+        window.location.href = "login.html";
+        return;
+      }
 
       if (!response.ok) {
         const message = await getErrorMessage(response, "Could not like post.");
@@ -241,14 +325,35 @@ postsList.addEventListener("click", async (event) => {
   }
 
   if (deleteButton) {
+    if (deleteButton.textContent === "Delete") {
+      deleteButton.textContent = "Confirm?";
+      deleteButton.classList.add("confirming");
+      
+      // Auto-revert after 3 seconds if not clicked
+      setTimeout(() => {
+        if (deleteButton && deleteButton.textContent === "Confirm?") {
+          deleteButton.textContent = "Delete";
+          deleteButton.classList.remove("confirming");
+        }
+      }, 3000);
+      return;
+    }
+
     if (pendingPostActions.has(`delete-${postId}`)) return;
     pendingPostActions.add(`delete-${postId}`);
     deleteButton.disabled = true;
+    deleteButton.textContent = "Deleting...";
 
     try {
       const response = await fetch(`${API_URL}/posts/${postId}`, {
         method: "DELETE"
       });
+      console.log("Delete response status:", response.status);
+
+      if (response.status === 401) {
+        window.location.href = "login.html";
+        return;
+      }
 
       if (!response.ok) {
         const message = await getErrorMessage(response, "Could not delete post.");
@@ -269,4 +374,8 @@ postsList.addEventListener("click", async (event) => {
   }
 });
 
-loadPosts();
+// Initialize
+(async function init() {
+  await fetchCurrentUser();
+  await loadPosts();
+})();

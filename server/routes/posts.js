@@ -53,6 +53,27 @@ router.get("/", (req, res, next) => {
   });
 });
 
+// Get posts by user ID
+router.get("/user/:userId", (req, res, next) => {
+  const db = req.app.locals.db;
+  const userId = req.params.userId;
+  const query = `
+    SELECT 
+      p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
+      COALESCE(u.emoji, '👻') as emoji,
+      COALESCE(u.username, 'anonymous') as username
+    FROM posts p
+    LEFT JOIN users u ON p.user_id = u.id
+    WHERE p.user_id = ?
+    ORDER BY p.id DESC
+  `;
+
+  db.all(query, [userId], (error, rows) => {
+    if (error) return next(error);
+    res.json(rows);
+  });
+});
+
 // Create a new post (Protected)
 router.post("/", isAuthenticated, upload.single("image"), (req, res, next) => {
   const db = req.app.locals.db;

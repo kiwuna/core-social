@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Core</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body class="auth-page">
     <div class="auth-container">
         <header>
             <h1 class="logo">Core</h1>
-            <p class="subtitle">Welcome back to the underground.</p>
+            <p class="subtitle">Welcome back to the void.</p>
         </header>
 
         <form id="login-form" class="auth-form">
@@ -39,10 +40,9 @@
 
         function showFeedback(message, type = 'success') {
             const feedback = document.createElement('div');
-            feedback.className = `feedback-message ${type}`;
+            feedback.className = `feedback-message ${type} show`;
             feedback.textContent = message;
             feedbackContainer.appendChild(feedback);
-            setTimeout(() => feedback.classList.add('show'), 10);
             setTimeout(() => {
                 feedback.classList.remove('show');
                 setTimeout(() => feedback.remove(), 300);
@@ -52,9 +52,8 @@
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // Safety check for beginners
             if (window.location.protocol === 'file:') {
-                showFeedback('Error: Open this through http://localhost:3000, not as a file!', 'error');
+                showFeedback('Error: Open through http://localhost:3000!', 'error');
                 return;
             }
 
@@ -75,8 +74,7 @@
                     showFeedback(data.error || 'Login failed', 'error');
                 }
             } catch (err) {
-                console.error('Login error:', err);
-                showFeedback('Connection error: Is the server running?', 'error');
+                showFeedback('Connection error: Is server running?', 'error');
             }
         });
     </script>

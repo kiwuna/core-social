@@ -1,15 +1,29 @@
-const API_URL = ""; // Relative URL for same-origin
+const API_URL = ""; 
 
 const postForm = document.getElementById("postForm");
 const postInput = document.getElementById("postInput");
-const postsList = document.getElementById("postsList");
+const postsList = document.getElementById("feedPosts");
+const profileContainer = document.getElementById("profileContent");
 const feedbackMessage = document.getElementById("feedbackMessage");
-const sendButton = postForm.querySelector(".send");
+const sendButton = postForm ? postForm.querySelector(".send") : null;
 const imageInput = document.getElementById("imageInput");
 const pickImageButton = document.getElementById("pickImageButton");
 const imagePreviewBox = document.getElementById("imagePreviewBox");
 const imagePreview = document.getElementById("imagePreview");
 const removeImageButton = document.getElementById("removeImageButton");
+
+// Views
+const feedView = document.getElementById("feedView");
+const profileView = document.getElementById("profileView");
+
+// Nav
+const navFeed = document.getElementById("navFeed");
+const navProfile = document.getElementById("navProfile");
+
+// Modal Elements
+const imageModal = document.getElementById("imageModal");
+const modalImage = document.getElementById("modalImage");
+const modalClose = document.getElementById("modalClose");
 
 // Auth UI Elements
 const userNameDisplay = document.getElementById("userNameDisplay");
@@ -26,9 +40,9 @@ let selectedImageFile = null;
 let selectedImagePreviewUrl = "";
 
 function showFeedback(message, type = "info") {
+  if (!feedbackMessage) return;
   feedbackMessage.textContent = message;
   feedbackMessage.className = `feedback-message ${type}`;
-
   if (!message) return;
   setTimeout(() => {
     if (feedbackMessage.textContent === message) {
@@ -39,12 +53,10 @@ function showFeedback(message, type = "info") {
 }
 
 function setPostFormState(loading) {
+  if (!sendButton) return;
   isPosting = loading;
   sendButton.disabled = loading;
-  pickImageButton.disabled = loading;
-  imageInput.disabled = loading;
-  removeImageButton.disabled = loading;
-  sendButton.textContent = loading ? "Sending..." : "Send";
+  sendButton.textContent = loading ? "..." : "Post";
 }
 
 async function getErrorMessage(response, fallbackMessage) {
@@ -61,13 +73,11 @@ function updateImagePreview(file) {
     URL.revokeObjectURL(selectedImagePreviewUrl);
     selectedImagePreviewUrl = "";
   }
-
   if (!file) {
     imagePreview.src = "";
     imagePreviewBox.classList.add("hidden");
     return;
   }
-
   selectedImagePreviewUrl = URL.createObjectURL(file);
   imagePreview.src = selectedImagePreviewUrl;
   imagePreviewBox.classList.remove("hidden");
@@ -78,14 +88,14 @@ function updateAuthUI() {
     userNameDisplay.textContent = currentUser.username;
     userHandleDisplay.textContent = `@${currentUser.username.toLowerCase()}`;
     userEmojiLarge.textContent = currentUser.emoji;
-    userEmojiMini.textContent = currentUser.emoji;
+    if (userEmojiMini) userEmojiMini.textContent = currentUser.emoji;
     logoutBtn.classList.remove("hidden");
     loginLink.classList.add("hidden");
   } else {
-    userNameDisplay.textContent = "Guest";
+    userNameDisplay.textContent = "Profile";
     userHandleDisplay.textContent = "@anonymous";
-    userEmojiLarge.textContent = "👻";
-    userEmojiMini.textContent = "👻";
+    userEmojiLarge.textContent = "👤";
+    if (userEmojiMini) userEmojiMini.textContent = "👻";
     logoutBtn.classList.add("hidden");
     loginLink.classList.remove("hidden");
   }
@@ -116,266 +126,305 @@ function createPostElement(post) {
     ? new Date(post.created_at).toLocaleString()
     : "Just now";
 
-  // Use the emoji from the post data (joined from users table)
   const displayEmoji = post.emoji || "👻";
   const displayUser = post.username || "anonymous";
-
-  // Only show delete button if the user owns the post
   const isOwner = currentUser && post.user_id === currentUser.id;
 
   postElement.innerHTML = `
     <div class="post-head">
-      <div class="mini-avatar" style="font-size: 24px; display: flex; align-items: center; justify-content: center; background: #1c2432; border: 1px solid #273149;">${displayEmoji}</div>
-      <div>
+      <div class="mini-avatar" style="cursor:pointer" data-user-id="${post.user_id}">${displayEmoji}</div>
+      <div class="post-user-info" style="cursor:pointer" data-user-id="${post.user_id}">
         <h3>${displayUser}</h3>
         <span class="meta">${createdAt}</span>
       </div>
-      <button class="more" type="button">⋯</button>
+      <div style="color: #444; font-size: 18px;">⋯</div>
     </div>
+    <div class="post-body"></div>
     <img class="post-image hidden" alt="Post image" />
-    <p class="post-body"></p>
     <footer class="post-foot">
-      <button class="action action-like stat-like" type="button" aria-label="Like post">
-        ♥ <span class="likes-count">${post.likes || 0}</span>
-      </button>
-      ${isOwner ? '<button class="action action-delete" type="button">Delete</button>' : ""}
+      <span class="action-like" style="cursor:pointer">❤ <span class="likes-count">${post.likes || 0}</span></span>
+      <span>💬 0</span>
+      <span>🔄 0</span>
+      ${isOwner ? '<button class="action-delete" style="background:none; border:0; color:#444; cursor:pointer; font-size:12px; margin-left:auto;">Delete</button>' : ""}
     </footer>
   `;
+
+  // Go to profile on avatar/name click
+  postElement.querySelectorAll('[data-user-id]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const uid = el.dataset.userId;
+      // Safety check for legacy posts, anonymous, or deleted users
+      if (uid && uid !== "null" && uid !== "undefined" && displayUser !== "anonymous") {
+         showProfile(uid);
+      } else {
+         showFeedback("This is an anonymous or deleted user.", "info");
+      }
+    });
+  });
 
   const postImageElement = postElement.querySelector(".post-image");
   if (post.image_path) {
     postImageElement.src = `${API_URL}${post.image_path}`;
     postImageElement.classList.remove("hidden");
+    postImageElement.addEventListener("click", (e) => {
+      e.stopPropagation();
+      modalImage.src = postImageElement.src;
+      imageModal.classList.add("show");
+    });
   }
 
   postElement.querySelector(".post-body").textContent = post.content;
   return postElement;
 }
 
-function showEmptyState() {
-  postsList.innerHTML = `<p class="empty">No posts yet. Be the first one.</p>`;
-}
-
-async function loadPosts() {
+async function loadFeed() {
   try {
-    showFeedback("Loading posts...", "info");
     const response = await fetch(`${API_URL}/posts`);
-    if (!response.ok) {
-      throw new Error("Could not load posts.");
-    }
+    if (!response.ok) throw new Error("Load failed");
     const posts = await response.json();
-
+    
     postsList.innerHTML = "";
-
-    if (!posts.length) {
-      showEmptyState();
-      return;
-    }
-
     posts.forEach((post) => {
       postsList.appendChild(createPostElement(post));
     });
-    showFeedback("");
   } catch (error) {
-    postsList.innerHTML = `<p class="empty">Could not load posts.</p>`;
     showFeedback("Could not load posts.", "error");
   }
 }
 
-postForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  if (!currentUser) {
-    window.location.href = "login.html";
+async function showProfile(userId) {
+  console.log("Loading profile for user:", userId);
+  if (!userId) {
+    showFeedback("Invalid User ID", "error");
     return;
   }
+  feedView.classList.add("hidden");
+  profileView.classList.remove("hidden");
+  navFeed.classList.remove("active");
+  navProfile.classList.add("active");
 
-  if (isPosting) return;
-
-  const content = postInput.value.trim();
-  if (!content && !selectedImageFile) {
-    showFeedback("Add text or choose an image before sending.", "error");
-    return;
-  }
-
-  setPostFormState(true);
+  profileContainer.innerHTML = `<div style="padding: 40px; color: var(--muted);">Loading profile...</div>`;
 
   try {
-    const formData = new FormData();
-    formData.append("content", content);
-    if (selectedImageFile) {
-      formData.append("image", selectedImageFile);
+    const userRes = await fetch(`/auth/users/${userId}`);
+    console.log("Profile fetch status:", userRes.status);
+    if (!userRes.ok) throw new Error("User not found");
+    const userData = (await userRes.json()).user;
+
+    const postsRes = await fetch(`/posts/user/${userId}`);
+    const userPosts = await postsRes.json();
+
+    const isMe = currentUser && String(currentUser.id) === String(userId);
+    const regDate = new Date(userData.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    profileContainer.innerHTML = `
+      <div class="profile-header">
+        <div class="profile-banner">
+          <div style="position: absolute; bottom: 20px; right: 20px;">
+             <button class="btn-pill btn-secondary">🎨 Theme</button>
+          </div>
+        </div>
+        <div class="profile-avatar-area">
+          <div class="large-avatar-wrap">
+            <div class="large-avatar">${userData.emoji}</div>
+            <div class="status-indicator"></div>
+          </div>
+          <div class="profile-actions">
+            ${isMe 
+              ? '<button class="btn-pill btn-edit">Edit Profile</button><button class="btn-pill btn-secondary">Settings</button>' 
+              : '<button class="btn-pill btn-follow">Follow</button><button class="btn-pill btn-secondary">Message</button>'}
+          </div>
+        </div>
+      </div>
+      
+      <div class="profile-info">
+        <h2>${userData.username} <span style="color: #6366f1; font-size: 18px;">✔</span></h2>
+        <p class="handle">@${userData.username.toLowerCase()}</p>
+        
+        <div class="profile-stats">
+          <span><b>0</b> followers</span>
+          <span><b>0</b> following</span>
+        </div>
+        
+        <div class="profile-meta">
+          <span>📅 Registered: ${regDate}</span>
+        </div>
+      </div>
+
+      <div class="profile-tabs">
+        <div class="tabs" style="justify-content: flex-start; background: transparent; padding: 0; border: 0;">
+           <button class="tab active" style="padding-left:0">Posts</button>
+           <button class="tab">Likes</button>
+        </div>
+      </div>
+
+      <div id="profilePosts" class="feed-content" style="padding: 24px 40px;"></div>
+    `;
+
+    const profilePosts = document.getElementById("profilePosts");
+    if (userPosts.length === 0) {
+      profilePosts.innerHTML = `<p style="color: var(--muted); text-align: center; padding: 40px;">No posts yet.</p>`;
+    } else {
+      userPosts.forEach(post => {
+        profilePosts.appendChild(createPostElement(post));
+      });
     }
 
-    const response = await fetch(`${API_URL}/posts`, {
-      method: "POST",
-      body: formData
-    });
-
-    if (response.status === 401) {
-      window.location.href = "login.html";
-      return;
-    }
-
-    if (!response.ok) {
-      const message = await getErrorMessage(response, "Could not save post.");
-      throw new Error(message);
-    }
-
-    postInput.value = "";
-    selectedImageFile = null;
-    imageInput.value = "";
-    updateImagePreview(null);
-    await loadPosts();
-    showFeedback("Post sent.", "success");
-  } catch (error) {
-    showFeedback(error.message || "Could not save post.", "error");
-  } finally {
-    setPostFormState(false);
-  }
-});
-
-pickImageButton.addEventListener("click", () => {
-  imageInput.click();
-});
-
-imageInput.addEventListener("change", () => {
-  const file = imageInput.files && imageInput.files[0];
-  if (!file) {
-    selectedImageFile = null;
-    updateImagePreview(null);
-    return;
-  }
-
-  if (!file.type.startsWith("image/")) {
-    showFeedback("Please select an image file.", "error");
-    selectedImageFile = null;
-    imageInput.value = "";
-    updateImagePreview(null);
-    return;
-  }
-
-  selectedImageFile = file;
-  updateImagePreview(file);
-});
-
-removeImageButton.addEventListener("click", () => {
-  selectedImageFile = null;
-  imageInput.value = "";
-  updateImagePreview(null);
-});
-
-logoutBtn.addEventListener("click", async () => {
-  try {
-    const res = await fetch("/auth/logout", { method: "POST" });
-    if (res.ok) {
-      window.location.reload();
-    }
   } catch (err) {
-    showFeedback("Logout failed", "error");
+    profileContainer.innerHTML = `
+      <div style="padding: 100px 40px; text-align: center;">
+        <h2 style="font-size: 24px; margin-bottom: 16px; color: #fff;">Profile Unavailable</h2>
+        <p style="color: var(--muted); margin-bottom: 32px;">This user might have been deleted or never existed.</p>
+        <button class="btn-pill btn-edit" onclick="showFeed()">Return to Feed</button>
+      </div>
+    `;
   }
-});
+}
 
-postsList.addEventListener("click", async (event) => {
-  const likeButton = event.target.closest(".action-like");
-  const deleteButton = event.target.closest(".action-delete");
-  const postElement = event.target.closest(".post");
+function showFeed() {
+  feedView.classList.remove("hidden");
+  profileView.classList.add("hidden");
+  navFeed.classList.add("active");
+  navProfile.classList.remove("active");
+  loadFeed();
+}
 
-  if (!postElement) return;
-  const postId = postElement.dataset.postId;
-  if (!postId) return;
+if (postForm) {
+  postForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentUser) { window.location.href = "login.html"; return; }
+    if (isPosting) return;
 
-  if (likeButton) {
-    if (!currentUser) {
-      window.location.href = "login.html";
-      return;
-    }
+    const content = postInput.value.trim();
+    if (!content && !selectedImageFile) return;
 
-    if (pendingPostActions.has(`like-${postId}`)) return;
-    pendingPostActions.add(`like-${postId}`);
-    likeButton.disabled = true;
-
+    setPostFormState(true);
     try {
-      const response = await fetch(`${API_URL}/posts/${postId}/like`, {
-        method: "POST"
+      const formData = new FormData();
+      formData.append("content", content);
+      if (selectedImageFile) formData.append("image", selectedImageFile);
+
+      const response = await fetch(`${API_URL}/posts`, {
+        method: "POST",
+        body: formData
       });
 
-      if (response.status === 401) {
-        window.location.href = "login.html";
-        return;
-      }
+      if (response.status === 401) { window.location.href = "login.html"; return; }
+      if (!response.ok) throw new Error(await getErrorMessage(response, "Error"));
 
-      if (!response.ok) {
-        const message = await getErrorMessage(response, "Could not like post.");
-        throw new Error(message);
-      }
-
-      const updatedPost = await response.json();
-      const likesCountElement = postElement.querySelector(".likes-count");
-      if (likesCountElement) {
-        likesCountElement.textContent = updatedPost.likes;
-      }
-      showFeedback("Liked.", "success");
+      postInput.value = "";
+      selectedImageFile = null;
+      if (imageInput) imageInput.value = "";
+      updateImagePreview(null);
+      await loadFeed();
     } catch (error) {
-      showFeedback(error.message || "Could not like post.", "error");
+      showFeedback(error.message, "error");
     } finally {
-      likeButton.disabled = false;
+      setPostFormState(false);
+    }
+  });
+}
+
+if (pickImageButton) pickImageButton.addEventListener("click", () => imageInput.click());
+if (imageInput) {
+  imageInput.addEventListener("change", () => {
+    const file = imageInput.files && imageInput.files[0];
+    if (file && file.type.startsWith("image/")) {
+      selectedImageFile = file;
+      updateImagePreview(file);
+    }
+  });
+}
+if (removeImageButton) {
+  removeImageButton.addEventListener("click", () => {
+    selectedImageFile = null;
+    imageInput.value = "";
+    updateImagePreview(null);
+  });
+}
+
+logoutBtn.addEventListener("click", async () => {
+  const res = await fetch("/auth/logout", { method: "POST" });
+  if (res.ok) window.location.reload();
+});
+
+navFeed.addEventListener("click", (e) => { e.preventDefault(); showFeed(); });
+navProfile.addEventListener("click", (e) => { 
+  e.preventDefault(); 
+  if (currentUser) showProfile(currentUser.id); 
+  else window.location.href = "login.html";
+});
+
+// Modal Close logic
+modalClose.addEventListener("click", () => imageModal.classList.remove("show"));
+imageModal.addEventListener("click", (e) => {
+  if (e.target === imageModal) imageModal.classList.remove("show");
+});
+
+// Global Event for Post Actions
+document.addEventListener("click", async (event) => {
+  const likeBtn = event.target.closest(".action-like");
+  const deleteButton = event.target.closest(".action-delete");
+  const postElement = event.target.closest(".post");
+  
+  if (!postElement) return;
+  const postId = postElement.dataset.postId;
+
+  // HANDLE LIKES
+  if (likeBtn) {
+    if (!currentUser) { window.location.href = "login.html"; return; }
+    if (pendingPostActions.has(`like-${postId}`)) return;
+    pendingPostActions.add(`like-${postId}`);
+
+    try {
+      const res = await fetch(`${API_URL}/posts/${postId}/like`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        const count = postElement.querySelector(".likes-count");
+        if (count) count.textContent = data.likes;
+        showFeedback("Liked!", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Error", "error");
+      }
+    } catch (err) {
+      showFeedback("Error", "error");
+    } finally {
       pendingPostActions.delete(`like-${postId}`);
     }
+    return;
   }
 
+  // HANDLE DELETE
   if (deleteButton) {
     if (deleteButton.textContent === "Delete") {
       deleteButton.textContent = "Confirm?";
-      deleteButton.classList.add("confirming");
-      
-      // Auto-revert after 3 seconds if not clicked
+      deleteButton.style.color = "#ff4444";
       setTimeout(() => {
-        if (deleteButton && deleteButton.textContent === "Confirm?") {
+        if (deleteButton.textContent === "Confirm?") {
           deleteButton.textContent = "Delete";
-          deleteButton.classList.remove("confirming");
+          deleteButton.style.color = "#444";
         }
       }, 3000);
       return;
     }
 
-    if (pendingPostActions.has(`delete-${postId}`)) return;
-    pendingPostActions.add(`delete-${postId}`);
-    deleteButton.disabled = true;
-    deleteButton.textContent = "Deleting...";
-
     try {
-      const response = await fetch(`${API_URL}/posts/${postId}`, {
-        method: "DELETE"
-      });
-      console.log("Delete response status:", response.status);
-
-      if (response.status === 401) {
-        window.location.href = "login.html";
-        return;
+      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE" });
+      if (res.ok) {
+        postElement.remove();
+        showFeedback("Deleted.", "success");
+      } else {
+        showFeedback("Delete failed", "error");
       }
-
-      if (!response.ok) {
-        const message = await getErrorMessage(response, "Could not delete post.");
-        throw new Error(message);
-      }
-
-      postElement.remove();
-      if (!postsList.querySelector(".post")) {
-        showEmptyState();
-      }
-      showFeedback("Post deleted.", "success");
-    } catch (error) {
-      showFeedback(error.message || "Could not delete post.", "error");
-    } finally {
-      deleteButton.disabled = false;
-      pendingPostActions.delete(`delete-${postId}`);
+    } catch (err) {
+      showFeedback("Error", "error");
     }
   }
 });
 
-// Initialize
 (async function init() {
   await fetchCurrentUser();
-  await loadPosts();
+  await loadFeed();
 })();

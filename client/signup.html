@@ -3,47 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join Core</title>
+    <title>Signup - Core</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body class="auth-page">
     <div class="auth-container">
         <header>
             <h1 class="logo">Core</h1>
-            <p class="subtitle">Join the anonymous collective.</p>
+            <p class="subtitle">Choose your identity.</p>
         </header>
 
         <form id="signup-form" class="auth-form">
             <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" placeholder="Choose a handle..." required autofocus>
+                <label>Emoji Identity</label>
+                <div class="emoji-picker">
+                    <button type="button" class="emoji-option selected" data-emoji="🍄">🍄</button>
+                    <button type="button" class="emoji-option" data-emoji="🪐">🪐</button>
+                    <button type="button" class="emoji-option" data-emoji="🧿">🧿</button>
+                    <button type="button" class="emoji-option" data-emoji="💎">💎</button>
+                    <button type="button" class="emoji-option" data-emoji="🦋">🦋</button>
+                    <button type="button" class="emoji-option" data-emoji="⚡">⚡</button>
+                    <button type="button" class="emoji-option" data-emoji="🔮">🔮</button>
+                    <button type="button" class="emoji-option" data-emoji="🖤">🖤</button>
+                </div>
+                <input type="hidden" id="selected-emoji" value="🍄">
+            </div>
+
+            <div class="form-group">
+                <label for="username">Handle</label>
+                <input type="text" id="username" placeholder="Unique username..." required>
             </div>
             
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" placeholder="Keep it secret..." required>
+                <label for="password">Secret</label>
+                <input type="password" id="password" placeholder="Min 6 characters..." required>
             </div>
 
-            <div class="form-group">
-                <label>Choose your Identity</label>
-                <div class="emoji-picker" id="emoji-picker">
-                    <button type="button" class="emoji-option selected" data-emoji="👻">👻</button>
-                    <button type="button" class="emoji-option" data-emoji="👽">👽</button>
-                    <button type="button" class="emoji-option" data-emoji="🤖">🤖</button>
-                    <button type="button" class="emoji-option" data-emoji="🦊">🦊</button>
-                    <button type="button" class="emoji-option" data-emoji="🐸">🐸</button>
-                    <button type="button" class="emoji-option" data-emoji="🍄">🍄</button>
-                    <button type="button" class="emoji-option" data-emoji="🌑">🌑</button>
-                    <button type="button" class="emoji-option" data-emoji="⚡">⚡</button>
-                </div>
-                <input type="hidden" id="selected-emoji" value="👻">
-            </div>
-
-            <button type="submit" class="primary-btn">Create Account</button>
+            <button type="submit" class="primary-btn">Begin Journey</button>
         </form>
 
         <footer class="auth-footer">
-            <p>Already have an account? <a href="login.html">Login</a></p>
+            <p>Known here? <a href="login.html">Login</a></p>
         </footer>
     </div>
 
@@ -54,20 +55,19 @@
         const emojiInput = document.getElementById('selected-emoji');
         const feedbackContainer = document.getElementById('feedback-container');
 
-        emojiOptions.forEach(btn => {
-            btn.addEventListener('click', () => {
-                emojiOptions.forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                emojiInput.value = btn.dataset.emoji;
+        emojiOptions.forEach(opt => {
+            opt.addEventListener('click', () => {
+                emojiOptions.forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                emojiInput.value = opt.dataset.emoji;
             });
         });
 
         function showFeedback(message, type = 'success') {
             const feedback = document.createElement('div');
-            feedback.className = `feedback-message ${type}`;
+            feedback.className = `feedback-message ${type} show`;
             feedback.textContent = message;
             feedbackContainer.appendChild(feedback);
-            setTimeout(() => feedback.classList.add('show'), 10);
             setTimeout(() => {
                 feedback.classList.remove('show');
                 setTimeout(() => feedback.remove(), 300);
@@ -76,10 +76,8 @@
 
         document.getElementById('signup-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-
-            // Safety check for beginners
             if (window.location.protocol === 'file:') {
-                showFeedback('Error: Open this through http://localhost:3000, not as a file!', 'error');
+                showFeedback('Error: Open through http://localhost:3000!', 'error');
                 return;
             }
 
@@ -95,14 +93,13 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    showFeedback('Account created! Entering Core...');
+                    showFeedback('Welcome to the Core.');
                     setTimeout(() => window.location.href = '/', 1500);
                 } else {
                     showFeedback(data.error || 'Signup failed', 'error');
                 }
             } catch (err) {
-                console.error('Signup error:', err);
-                showFeedback('Connection error: Is the server running?', 'error');
+                showFeedback('Connection error: Is server running?', 'error');
             }
         });
     </script>

@@ -79,4 +79,15 @@ router.get("/me", (req, res) => {
   });
 });
 
+// Get User by ID
+router.get("/users/:id", (req, res, next) => {
+  const db = req.app.locals.db;
+  const userId = Number(req.params.id);
+  db.get("SELECT id, username, emoji, created_at FROM users WHERE id = ?", [userId], (err, user) => {
+    if (err) return next(err);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ user });
+  });
+});
+
 module.exports = router;

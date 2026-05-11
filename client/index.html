@@ -3,107 +3,124 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Core — Feeds</title>
+<title>Core — Liquid</title>
 <link rel="stylesheet" href="./style.css" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="bg-orb orb-1"></div>
-  <div class="bg-orb orb-2"></div>
-
   <main class="dashboard">
+    <!-- Sidebar -->
     <aside class="sidebar">
-      <div id="userProfile" class="profile">
-        <!-- Will be populated by JS -->
-        <div class="avatar-stack">
-          <div class="avatar avatar-art" aria-hidden="true">
-            <span id="userEmojiLarge" style="font-size: 40px; display: flex; align-items: center; justify-content: center; height: 100%;">👻</span>
-          </div>
-        </div>
-        <h2 id="userNameDisplay">Guest</h2>
-        <p class="handle" id="userHandleDisplay">@anonymous</p>
-        <button id="logoutBtn" class="logout-btn hidden">Log out</button>
-        <a id="loginLink" href="login.html" class="primary-btn" style="display: block; margin-top: 10px; text-decoration: none; text-align: center; font-size: 14px;">Login</a>
+      <div class="logo-area">
+        <h1>CORE</h1>
+        <span>v1.1</span>
       </div>
 
       <nav class="nav">
-        <a class="nav-item active" href="#"><span class="ico">⌂</span> News Feed</a>
-        <a class="nav-item" href="#"><span class="ico">🔔</span> Notifications <span class="badge">6</span></a>
-        <a class="nav-item" href="#"><span class="ico">🛡</span> Clan</a>
-        <a class="nav-item" href="#"><span class="ico">◉</span> Friends <span class="badge">3</span></a>
-        <a class="nav-item" href="#"><span class="ico">⚙</span> Settings</a>
+        <a id="navFeed" class="nav-item active" href="#"><span class="ico">📰</span> <span>Feed</span></a>
+        <a id="navSearch" class="nav-item" href="#"><span class="ico">🔍</span> <span>Search</span></a>
+        <a id="navEvents" class="nav-item" href="#"><span class="ico">🎭</span> <span>Events</span></a>
+        <a id="navNotifications" class="nav-item" href="#"><span class="ico">🔔</span> <span>Notifications</span></a>
+        <a id="navProfile" class="nav-item" href="#">
+          <span class="ico" id="userEmojiLarge">👤</span> 
+          <div style="display: flex; flex-direction: column; line-height: 1.2;">
+            <span id="userNameDisplay">Profile</span>
+            <span id="userHandleDisplay" style="font-size: 11px; opacity: 0.5;">@anonymous</span>
+          </div>
+        </a>
       </nav>
+
+      <div class="sidebar-footer">
+        <a href="#" class="footer-link"><span class="ico">⭐</span> <span>CORE PRO</span></a>
+        <a href="#" id="logoutBtn" class="footer-link hidden"><span class="ico">🚪</span> <span>Logout</span></a>
+        <a href="login.html" id="loginLink" class="footer-link"><span class="ico">🔑</span> <span>Login</span></a>
+      </div>
     </aside>
 
-    <section class="feed">
-      <header class="feed-head">
-        <h1>Feeds</h1>
-        <div class="tabs">
-          <button class="tab">Recents</button>
-          <button class="tab active">Friends</button>
-          <button class="tab">Popular</button>
+    <!-- Content Area -->
+    <div id="contentArea" style="display: contents;">
+      
+      <!-- Main Feed -->
+      <section id="feedView" class="feed">
+        <div class="feed-tabs-container">
+          <div class="tabs">
+            <button class="tab active">For you</button>
+            <button class="tab">Clans</button>
+            <button class="tab">Following</button>
+          </div>
         </div>
-      </header>
 
-      <form id="postForm" class="composer" autocomplete="off">
-        <span id="userEmojiMini" class="mini-avatar" style="font-size: 24px; display: flex; align-items: center; justify-content: center; background: #1c2432; border: 1px solid #273149;">👻</span>
-        <input
-          id="postInput"
-          type="text"
-          name="corePostInput"
-          placeholder="Share something"
-          maxlength="300"
-          required
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
-        />
-        <button type="button" class="emoji">◌</button>
-        <input id="imageInput" type="file" accept="image/*" hidden />
-        <div class="composer-row">
-          <button type="button">⌗ File</button>
-          <button id="pickImageButton" type="button">▦ Image</button>
-          <button type="button">⌖ Location</button>
-          <button type="button">◎ Public ▾</button>
-          <button type="submit" class="send">Send</button>
+        <div id="postsList" class="feed-content" style="padding-bottom: 0;">
+          <!-- Composer -->
+          <form id="postForm" class="composer" autocomplete="off">
+            <div class="composer-top">
+               <span id="userEmojiMini" class="mini-avatar">👻</span>
+               <input
+                 id="postInput"
+                 type="text"
+                 placeholder="What's on your mind?"
+                 maxlength="300"
+                 required
+                 autocomplete="off"
+               />
+            </div>
+            
+            <div class="composer-bottom">
+              <div class="composer-tools">
+                <span id="pickImageButton">📎</span>
+                <span>😊</span>
+                <span>🎨</span>
+                <span>📊</span>
+              </div>
+              <input id="imageInput" type="file" accept="image/*" hidden />
+              <button type="submit" class="send">Post</button>
+            </div>
+
+            <div id="imagePreviewBox" class="image-preview-box hidden" style="margin-top: 15px;">
+              <img id="imagePreview" alt="Preview" style="max-width: 100px; border-radius: 12px;" />
+              <button id="removeImageButton" type="button" style="background: none; border: 0; color: #888; cursor: pointer;">Remove</button>
+            </div>
+          </form>
+
+          <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
         </div>
-        <div id="imagePreviewBox" class="image-preview-box hidden">
-          <img id="imagePreview" class="image-preview" alt="Selected preview" />
-          <button id="removeImageButton" type="button" class="remove-image">Remove image</button>
+
+        <!-- Feed Posts Container -->
+        <div id="feedPosts" class="feed-content" style="padding-top: 0; flex: 1; min-height: 0;"></div>
+      </section>
+
+      <!-- Profile View -->
+      <section id="profileView" class="feed hidden">
+        <div id="profileContent" class="feed-content" style="padding: 0; overflow-x: hidden;">
+          <!-- Profile header and posts injected here -->
         </div>
-      </form>
-      <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
+      </section>
 
-      <div id="postsList" class="posts-list"></div>
-    </section>
+    </div>
 
+    <!-- Right Rail -->
     <aside class="News">
-      <section>
-        <h2>Stories</h2>
-        <div class="stories">
-          <div class="story">
-            <img src="https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=400&auto=format&fit=crop" alt="" />
-            <div class="story-foot"><img src="https://i.pravatar.cc/40?img=20" alt=""/><span>Anatoly Pr…</span></div>
-          </div>
-          <div class="story">
-            <img src="https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=400&auto=format&fit=crop" alt="" />
-            <div class="story-foot"><img src="https://i.pravatar.cc/40?img=44" alt=""/><span>Lolita Earns</span></div>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h2>Trending</h2>
-        <ul class="suggestions">
-          <li><button>#AIart</button></li>
-          <li><button>#Web3</button></li>
-          <li><button>#Crypto</button></li>
+      <div class="info-links">
+        <ul>
+          <li>Server Status</li>
+          <li>Terms of Service</li>
+          <li>Privacy Policy</li>
+          <li>Cookie Policy</li>
         </ul>
-        <a class="seeall" href="#">See all</a>
-      </section>
-
+      </div>
+      <div class="copyright">
+        © 2026 CORE Social
+      </div>
     </aside>
   </main>
+
+  <!-- Image Expansion Modal -->
+  <div id="imageModal" class="image-modal">
+    <div class="modal-close" id="modalClose">&times;</div>
+    <div class="modal-content">
+      <img id="modalImage" alt="Expanded View" />
+    </div>
+  </div>
 
   <script src="./script.js"></script>
 </body>

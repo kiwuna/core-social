@@ -1093,3 +1093,331 @@ body {
   from { opacity: 0; transform: translateX(10px); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* ═══════════════════════════════════════ */
+/* Search View — Premium Dark             */
+/* ═══════════════════════════════════════ */
+.search-view-container {
+  padding: 40px 60px;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-height: 100vh;
+}
+
+.search-header {
+  animation: searchFadeIn 0.5s ease;
+}
+
+.search-title {
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.search-subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+/* Search Input */
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  animation: searchFadeIn 0.6s ease;
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+  pointer-events: none;
+  transition: color 0.3s ease;
+}
+
+.search-input-wrapper:focus-within .search-input-icon {
+  color: #fff;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  padding: 18px 50px 18px 52px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+.search-input-wrapper input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.search-input-wrapper input:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.search-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* Search Tabs */
+.search-tabs {
+  display: flex;
+  gap: 8px;
+  animation: searchFadeIn 0.7s ease;
+}
+
+.search-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.search-tab.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* Search Results */
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: searchFadeIn 0.8s ease;
+}
+
+/* People Result Card */
+.search-user-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: searchResultIn 0.4s ease backwards;
+}
+
+.search-user-card:hover {
+  background: var(--panel-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.search-user-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+  border: 1px solid var(--panel-border);
+}
+
+.search-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-user-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 3px;
+}
+
+.search-user-handle {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.search-user-bio {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-user-arrow {
+  color: var(--muted);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.search-user-card:hover .search-user-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Post Result Card — reuses .post but with search highlight */
+.search-post-result {
+  position: relative;
+}
+
+.search-highlight {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 1px 3px;
+  border-radius: 4px;
+}
+
+/* Empty State */
+.search-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+  animation: searchFadeIn 0.6s ease;
+}
+
+.search-empty-icon {
+  font-size: 56px;
+  margin-bottom: 20px;
+  filter: grayscale(0.6) brightness(0.8);
+}
+
+.search-empty-state p {
+  font-size: 18px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+}
+
+.search-empty-state span {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Loading State */
+.search-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.search-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  animation: searchSpin 0.7s linear infinite;
+}
+
+/* No Results State */
+.search-no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.search-no-results .search-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.search-no-results p {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6px;
+}
+
+.search-no-results span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Result count badge */
+.search-results-count {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+@keyframes searchFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes searchResultIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes searchSpin {
+  to { transform: rotate(360deg); }
+}

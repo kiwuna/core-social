@@ -51,10 +51,22 @@ const pollQuestionInput = document.getElementById("pollQuestion");
 
 // Views
 const feedView = document.getElementById("feedView");
+const searchView = document.getElementById("searchView");
 
 // Nav
 const navFeed = document.getElementById("navFeed");
+const navSearch = document.getElementById("navSearch");
 const navProfile = document.getElementById("navProfile");
+
+// Search Elements
+const searchInput = document.getElementById("searchInput");
+const searchClearBtn = document.getElementById("searchClearBtn");
+const searchResults = document.getElementById("searchResults");
+const searchTabs = document.querySelectorAll(".search-tab");
+let searchDebounceTimer = null;
+let activeSearchTab = "people";
+let cachedSearchUsers = [];
+let cachedSearchPosts = [];
 
 // Modal Elements
 const imageModal = document.getElementById("imageModal");
@@ -321,15 +333,21 @@ async function loadFeed() {
   }
 }
 
+function hideAllViews() {
+  feedView.classList.add("hidden");
+  if (searchView) searchView.classList.add("hidden");
+  profileView.classList.add("hidden");
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+}
+
 async function showProfile(userId) {
   console.log("Loading profile for user:", userId);
   if (!userId) {
     showFeedback("Invalid User ID", "error");
     return;
   }
-  feedView.classList.add("hidden");
+  hideAllViews();
   profileView.classList.remove("hidden");
-  navFeed.classList.remove("active");
   navProfile.classList.add("active");
 
   profileContent.innerHTML = `<div style="padding: 40px; color: var(--muted);">Loading profile...</div>`;
@@ -431,12 +449,193 @@ async function showProfile(userId) {
 }
 
 function showFeed() {
+  hideAllViews();
   feedView.classList.remove("hidden");
-  profileView.classList.add("hidden");
   navFeed.classList.add("active");
-  navProfile.classList.remove("active");
   loadFeed();
 }
+
+function showSearchView() {
+  hideAllViews();
+  searchView.classList.remove("hidden");
+  navSearch.classList.add("active");
+  setTimeout(() => searchInput && searchInput.focus(), 100);
+}
+
+// ═══════════════════════════════════════
+// Search Logic
+// ═══════════════════════════════════════
+
+async function performSearch(query) {
+  if (!query || query.length < 1) {
+    searchResults.innerHTML = `
+      <div class="search-empty-state">
+        <div class="search-empty-icon">🔍</div>
+        <p>Start typing to search</p>
+        <span>Find users, posts, and conversations</span>
+      </div>`;
+    cachedSearchUsers = [];
+    cachedSearchPosts = [];
+    return;
+  }
+
+  // Show loading
+  searchResults.innerHTML = `
+    <div class="search-loading">
+      <div class="search-spinner"></div>
+      <span>Searching...</span>
+    </div>`;
+
+  try {
+    const [usersRes, postsRes] = await Promise.all([
+      fetch(`${API_URL}/auth/users/search/${encodeURIComponent(query)}`),
+      fetch(`${API_URL}/posts/search?q=${encodeURIComponent(query)}`)
+    ]);
+
+    cachedSearchUsers = usersRes.ok ? await usersRes.json() : [];
+    cachedSearchPosts = postsRes.ok ? await postsRes.json() : [];
+
+    renderSearchResults(query);
+  } catch (err) {
+    searchResults.innerHTML = `
+      <div class="search-no-results">
+        <div class="search-empty-icon">⚠️</div>
+        <p>Search failed</p>
+        <span>Please try again</span>
+      </div>`;
+  }
+}
+
+function renderSearchResults(query) {
+  const isUsers = activeSearchTab === "people";
+  const data = isUsers ? cachedSearchUsers : cachedSearchPosts;
+
+  // Update tab counts
+  searchTabs.forEach(tab => {
+    const type = tab.dataset.searchTab;
+    const count = type === "people" ? cachedSearchUsers.length : cachedSearchPosts.length;
+    // Remove old badge
+    const oldBadge = tab.querySelector('.search-tab-count');
+    if (oldBadge) oldBadge.remove();
+    if (count > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'search-tab-count';
+      badge.style.cssText = 'font-size:12px; opacity:0.5; margin-left: 4px;';
+      badge.textContent = `(${count})`;
+      tab.appendChild(badge);
+    }
+  });
+
+  if (data.length === 0) {
+    searchResults.innerHTML = `
+      <div class="search-no-results">
+        <div class="search-empty-icon">😶</div>
+        <p>No ${isUsers ? 'people' : 'posts'} found</p>
+        <span>Try a different search term</span>
+      </div>`;
+    return;
+  }
+
+  if (isUsers) {
+    renderUserResults(data, query);
+  } else {
+    renderPostResults(data, query);
+  }
+}
+
+function highlightText(text, query) {
+  if (!query) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  return text.replace(regex, '<span class="search-highlight">$1</span>');
+}
+
+function renderUserResults(users, query) {
+  let html = `<div class="search-results-count">${users.length} people found</div>`;
+  
+  users.forEach((user, i) => {
+    const bioSnippet = user.bio ? `<div class="search-user-bio">${highlightText(user.bio, query)}</div>` : '';
+    html += `
+      <div class="search-user-card" data-user-id="${user.id}" style="animation-delay: ${i * 0.05}s">
+        <div class="search-user-avatar">${user.emoji || '👤'}</div>
+        <div class="search-user-info">
+          <div class="search-user-name">${highlightText(user.username, query)}</div>
+          <div class="search-user-handle">@${user.username.toLowerCase()}</div>
+          ${bioSnippet}
+        </div>
+        <svg class="search-user-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>`;
+  });
+
+  searchResults.innerHTML = html;
+
+  // Wire up clicks
+  searchResults.querySelectorAll('.search-user-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const uid = card.dataset.userId;
+      if (uid) showProfile(uid);
+    });
+  });
+}
+
+function renderPostResults(posts, query) {
+  let html = `<div class="search-results-count">${posts.length} posts found</div>`;
+  searchResults.innerHTML = html;
+
+  posts.forEach((post, i) => {
+    const el = createPostElement(post);
+    el.classList.add('search-post-result');
+    el.style.animationDelay = `${i * 0.05}s`;
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+    searchResults.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = 'all 0.4s ease';
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    }, i * 50);
+  });
+}
+
+// Search event listeners
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    searchClearBtn.classList.toggle('hidden', !q);
+    
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => performSearch(q), 300);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchClearBtn.classList.add('hidden');
+      performSearch('');
+    }
+  });
+}
+
+if (searchClearBtn) {
+  searchClearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClearBtn.classList.add('hidden');
+    performSearch('');
+    searchInput.focus();
+  });
+}
+
+searchTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    searchTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeSearchTab = tab.dataset.searchTab;
+    const q = searchInput ? searchInput.value.trim() : '';
+    if (q) renderSearchResults(q);
+  });
+});
 
 if (postForm) {
   postForm.addEventListener("submit", async (event) => {
@@ -553,6 +752,7 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 navFeed.addEventListener("click", (e) => { e.preventDefault(); showFeed(); });
+if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); showSearchView(); });
 navProfile.addEventListener("click", (e) => { 
   e.preventDefault(); 
   if (currentUser) showProfile(currentUser.id); 

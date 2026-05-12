@@ -117,4 +117,18 @@ router.post("/update-profile", (req, res, next) => {
   });
 });
 
+// Search users by username
+router.get("/users/search/:query", (req, res, next) => {
+  const db = req.app.locals.db;
+  const q = (req.params.query || "").trim();
+
+  if (!q) return res.json([]);
+
+  const query = `SELECT id, username, emoji, bio, created_at FROM users WHERE username LIKE ? LIMIT 20`;
+  db.all(query, [`%${q}%`], (err, rows) => {
+    if (err) return next(err);
+    res.json(rows);
+  });
+});
+
 module.exports = router;

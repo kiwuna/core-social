@@ -110,6 +110,57 @@
         </div>
       </section>
 
+      <!-- Search View -->
+      <section id="searchView" class="feed hidden">
+        <div class="search-view-container">
+          <div class="search-header">
+            <h2 class="search-title">Search</h2>
+            <p class="search-subtitle">Find people and posts on CORE</p>
+          </div>
+          
+          <div class="search-input-wrapper">
+            <svg class="search-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input 
+              id="searchInput" 
+              type="text" 
+              placeholder="Search people, posts, polls..." 
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="searchClearBtn" class="search-clear-btn hidden" type="button">&times;</button>
+          </div>
+
+          <div class="search-tabs">
+            <button class="search-tab active" data-search-tab="people">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              People
+            </button>
+            <button class="search-tab" data-search-tab="posts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+              </svg>
+              Posts
+            </button>
+          </div>
+
+          <div id="searchResults" class="search-results">
+            <div class="search-empty-state">
+              <div class="search-empty-icon">🔍</div>
+              <p>Start typing to search</p>
+              <span>Find users, posts, and conversations</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Profile View -->
       <section id="profileView" class="feed hidden">
         <div id="profileContent" class="feed-content" style="padding: 0; overflow-x: hidden;">

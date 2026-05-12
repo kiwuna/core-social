@@ -41,6 +41,7 @@
             </div>
 
             <button type="submit" class="primary-btn">Begin Journey</button>
+            <div id="feedback-container"></div>
         </form>
 
         <footer class="auth-footer">
@@ -48,7 +49,7 @@
         </footer>
     </div>
 
-    <div id="feedback-container"></div>
+
 
     <script>
         const emojiOptions = document.querySelectorAll('.emoji-option');
@@ -64,18 +65,23 @@
         });
 
         function showFeedback(message, type = 'success') {
+            feedbackContainer.innerHTML = '';
             const feedback = document.createElement('div');
             feedback.className = `feedback-message ${type} show`;
             feedback.textContent = message;
             feedbackContainer.appendChild(feedback);
             setTimeout(() => {
                 feedback.classList.remove('show');
-                setTimeout(() => feedback.remove(), 300);
+                setTimeout(() => { if (feedback.parentNode === feedbackContainer) feedback.remove(); }, 300);
             }, 3000);
         }
 
         document.getElementById('signup-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const form = e.target;
+            const inputs = form.querySelectorAll('input');
+            inputs.forEach(i => i.classList.remove('error-state'));
+
             if (window.location.protocol === 'file:') {
                 showFeedback('Error: Open through http://localhost:3000!', 'error');
                 return;
@@ -97,6 +103,12 @@
                     setTimeout(() => window.location.href = '/', 1500);
                 } else {
                     showFeedback(data.error || 'Signup failed', 'error');
+                    // Specifically highlight the username if it's taken or invalid
+                    if (data.error && data.error.toLowerCase().includes('username')) {
+                        document.getElementById('username').classList.add('error-state');
+                    } else {
+                        inputs.forEach(i => i.classList.add('error-state'));
+                    }
                 }
             } catch (err) {
                 showFeedback('Connection error: Is server running?', 'error');

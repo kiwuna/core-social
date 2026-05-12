@@ -1,5 +1,20 @@
 const API_URL = ""; 
+const CURRENT_TIME = new Date();
 
+function timeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + "y";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + "mo";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + "d";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + "h";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + "m";
+  return Math.floor(seconds) + "s";
+}
 function formatNumber(num) {
   if (!num) return "0";
   if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
@@ -130,8 +145,8 @@ function createPostElement(post) {
   postElement.dataset.postId = String(post.id);
 
   const createdAt = post.created_at
-    ? new Date(post.created_at).toLocaleString()
-    : "Just now";
+    ? timeAgo(new Date(post.created_at))
+    : "just now";
 
   const displayEmoji = post.emoji || "👻";
   const displayUser = post.username || "anonymous";
@@ -144,15 +159,24 @@ function createPostElement(post) {
         <h3>${displayUser}</h3>
         <span class="meta">${createdAt}</span>
       </div>
-      <div style="color: #444; font-size: 18px;">⋯</div>
+      <div class="post-more">⋯</div>
     </div>
     <div class="post-body"></div>
     <img class="post-image hidden" alt="Post image" />
     <footer class="post-foot">
-      <span class="action-like ${post.has_liked ? "liked" : ""}" style="cursor:pointer">❤ <span class="likes-count">${formatNumber(post.likes || 0)}</span></span>
-      <span class="action-comment" style="cursor:pointer">💬 <span class="comments-count">${formatNumber(post.comment_count || 0)}</span></span>
-      <span>🔄 0</span>
-      ${isOwner ? '<button class="action-delete" style="background:none; border:0; color:#444; cursor:pointer; font-size:12px; margin-left:auto;">Delete</button>' : ""}
+      <span class="action-like ${post.has_liked ? "liked" : ""}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="action-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+        <span class="likes-count">${formatNumber(post.likes || 0)}</span>
+      </span>
+      <span class="action-comment">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="action-icon"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        <span class="comments-count">${formatNumber(post.comment_count || 0)}</span>
+      </span>
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="action-icon"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        0
+      </span>
+      ${isOwner ? '<button class="action-delete" style="margin-left:auto;">Delete</button>' : ""}
     </footer>
     <div class="comments-container hidden"></div>
   `;
@@ -193,8 +217,16 @@ async function loadFeed() {
     const posts = await response.json();
     
     postsList.innerHTML = "";
-    posts.forEach((post) => {
-      postsList.appendChild(createPostElement(post));
+    posts.forEach((post, index) => {
+      const el = createPostElement(post);
+      el.style.opacity = "0";
+      el.style.transform = "translateY(10px)";
+      postsList.appendChild(el);
+      setTimeout(() => {
+        el.style.transition = "all 0.4s ease";
+        el.style.opacity = "1";
+        el.style.transform = "translateY(0)";
+      }, index * 50);
     });
   } catch (error) {
     showFeedback("Could not load posts.", "error");
@@ -227,6 +259,15 @@ async function showProfile(userId) {
     const regDate = new Date(userData.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
     profileContainer.innerHTML = `
+      <div class="profile-nav-top">
+        <button class="back-btn" onclick="showFeed()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <div class="mini-profile-info">
+          <span class="mini-name">${userData.username}</span>
+          <span class="mini-meta">${userPosts.length} posts</span>
+        </div>
+      </div>
       <div class="profile-header">
         <div class="profile-banner">
           <div style="position: absolute; bottom: 20px; right: 20px;">
@@ -247,7 +288,7 @@ async function showProfile(userId) {
       </div>
       
       <div class="profile-info">
-        <h2>${userData.username} <span style="color: #6366f1; font-size: 18px;">✔</span></h2>
+        <h2>${userData.username}</h2>
         <p class="handle">@${userData.username.toLowerCase()}</p>
         
         <div class="profile-stats">
@@ -261,13 +302,13 @@ async function showProfile(userId) {
       </div>
 
       <div class="profile-tabs">
-        <div class="tabs" style="justify-content: flex-start; background: transparent; padding: 0; border: 0;">
-           <button class="tab active" style="padding-left:0">Posts</button>
+        <div class="tabs">
+           <button class="tab active">Posts</button>
            <button class="tab">Likes</button>
         </div>
       </div>
 
-      <div id="profilePosts" class="feed-content" style="padding: 24px 40px;"></div>
+      <div id="profilePosts" style="padding: 24px 40px;"></div>
     `;
 
     const profilePosts = document.getElementById("profilePosts");
@@ -278,7 +319,15 @@ async function showProfile(userId) {
         profilePosts.appendChild(createPostElement(post));
       });
     }
-
+    
+    window.onscroll = () => {
+      const st = window.pageYOffset || document.documentElement.scrollTop;
+      const nav = profileContainer.querySelector('.profile-nav-top');
+      if (nav) {
+        if (st > 150) nav.classList.add('active');
+        else nav.classList.remove('active');
+      }
+    };
   } catch (err) {
     profileContainer.innerHTML = `
       <div style="padding: 100px 40px; text-align: center;">
@@ -446,26 +495,13 @@ let lastScrollTop = 0;
 
 let isHeaderHidden = false;
 
-function handleScroll(e) {
-  const st = e.target.scrollTop;
+function handleScroll() {
+  const st = window.pageYOffset || document.documentElement.scrollTop;
   if (!stickyHeader) return;
-
-  // Decision threshold
-  if (st > lastScrollTop && st > 150 && !isHeaderHidden) {
-    stickyHeader.classList.add("hidden");
-    isHeaderHidden = true;
-  } else if (st < lastScrollTop && isHeaderHidden) {
-    stickyHeader.classList.remove("hidden");
-    isHeaderHidden = false;
-  }
-  
   lastScrollTop = st;
 }
 
-const feedScrollArea = document.getElementById("feedScrollArea");
-if (feedScrollArea) {
-  feedScrollArea.addEventListener("scroll", handleScroll);
-}
+window.addEventListener("scroll", handleScroll);
 
 async function toggleComments(postId, postElement) {
   const container = postElement.querySelector(".comments-container");

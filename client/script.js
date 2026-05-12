@@ -24,8 +24,17 @@ function formatNumber(num) {
 
 const postForm = document.getElementById("postForm");
 const postInput = document.getElementById("postInput");
-const postsList = document.getElementById("feedPosts");
-const profileContainer = document.getElementById("profileContent");
+const profileView = document.getElementById("profileView");
+const profileContent = document.getElementById("profileContent");
+const settingsModal = document.getElementById("settingsModal");
+const closeSettings = document.getElementById("closeSettings");
+const saveProfile = document.getElementById("saveProfile");
+const settingsNavItems = document.querySelectorAll(".settings-nav-item");
+const settingsTabContents = document.querySelectorAll(".settings-tab-content");
+const settingsUsername = document.getElementById("settingsUsername");
+const settingsBio = document.getElementById("settingsBio");
+const settingsUserEmoji = document.getElementById("settingsUserEmoji");
+const settingsTabTitle = document.getElementById("settingsTabTitle");
 const feedbackMessage = document.getElementById("feedbackMessage");
 const sendButton = postForm ? postForm.querySelector(".send") : null;
 const imageInput = document.getElementById("imageInput");
@@ -33,10 +42,15 @@ const pickImageButton = document.getElementById("pickImageButton");
 const imagePreviewBox = document.getElementById("imagePreviewBox");
 const imagePreview = document.getElementById("imagePreview");
 const removeImageButton = document.getElementById("removeImageButton");
+const togglePollButton = document.getElementById("togglePollButton");
+const pollCreator = document.getElementById("pollCreator");
+const closePollButton = document.getElementById("closePollButton");
+const addPollOptionButton = document.getElementById("addPollOption");
+const pollOptionsContainer = document.getElementById("pollOptionsContainer");
+const pollQuestionInput = document.getElementById("pollQuestion");
 
 // Views
 const feedView = document.getElementById("feedView");
-const profileView = document.getElementById("profileView");
 
 // Nav
 const navFeed = document.getElementById("navFeed");
@@ -207,6 +221,79 @@ function createPostElement(post) {
   }
 
   postElement.querySelector(".post-body").textContent = post.content;
+
+  // Render Poll if exists
+  if (post.poll) {
+    const poll = post.poll;
+    const pollDiv = document.createElement("div");
+    pollDiv.className = "poll-display";
+    
+    const isVoted = poll.user_has_voted;
+    let optionsHtml = "";
+    poll.options.forEach(opt => {
+      const percentage = poll.total_votes > 0 ? Math.round((opt.vote_count / poll.total_votes) * 100) : 0;
+      const userChoice = opt.user_voted;
+      
+      optionsHtml += `
+        <div class="poll-option ${isVoted ? "voted" : ""} ${userChoice ? "user-voted" : ""}" data-option-id="${opt.id}">
+          ${isVoted ? `<div class="poll-vote-bar" style="width: ${percentage}%"></div>` : ""}
+          <span class="poll-option-text">${opt.option_text}</span>
+          ${isVoted ? `<span class="poll-option-percent">${percentage}%</span>` : ""}
+        </div>
+      `;
+    });
+
+    pollDiv.innerHTML = `
+      <div class="poll-question">${poll.question}</div>
+      <div class="poll-options">
+        ${optionsHtml}
+      </div>
+      <div class="poll-footer">
+        <span>${isVoted ? `${poll.total_votes} votes` : "Vote to see results"}</span>
+        <span>${isVoted ? "Final results" : "Poll active"}</span>
+      </div>
+    `;
+
+    // Handle voting
+    if (!isVoted) {
+      pollDiv.querySelectorAll(".poll-option").forEach(optEl => {
+        optEl.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if (!currentUser) { window.location.href = "login.html"; return; }
+          if (postElement.dataset.voting === "true") return;
+          
+          const optionId = optEl.dataset.optionId;
+          postElement.dataset.voting = "true";
+          
+          try {
+            const res = await fetch(`${API_URL}/posts/${post.id}/vote`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ optionId })
+            });
+            
+            if (res.ok) {
+              const data = await res.json();
+              post.poll = data.poll;
+              const newPostEl = createPostElement(post);
+              postElement.replaceWith(newPostEl);
+              showFeedback("Vote recorded!", "success");
+            } else {
+              const err = await res.json();
+              showFeedback(err.error || "Voting failed", "error");
+              postElement.dataset.voting = "false";
+            }
+          } catch (err) {
+            showFeedback("Voting failed", "error");
+            postElement.dataset.voting = "false";
+          }
+        });
+      });
+    }
+
+    postElement.querySelector(".post-body").after(pollDiv);
+  }
+
   return postElement;
 }
 
@@ -216,6 +303,7 @@ async function loadFeed() {
     if (!response.ok) throw new Error("Load failed");
     const posts = await response.json();
     
+    const postsList = document.getElementById("feedPosts");
     postsList.innerHTML = "";
     posts.forEach((post, index) => {
       const el = createPostElement(post);
@@ -244,7 +332,7 @@ async function showProfile(userId) {
   navFeed.classList.remove("active");
   navProfile.classList.add("active");
 
-  profileContainer.innerHTML = `<div style="padding: 40px; color: var(--muted);">Loading profile...</div>`;
+  profileContent.innerHTML = `<div style="padding: 40px; color: var(--muted);">Loading profile...</div>`;
 
   try {
     const userRes = await fetch(`/auth/users/${userId}`);
@@ -258,7 +346,7 @@ async function showProfile(userId) {
     const isMe = currentUser && String(currentUser.id) === String(userId);
     const regDate = new Date(userData.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-    profileContainer.innerHTML = `
+    profileContent.innerHTML = `
       <div class="profile-nav-top">
         <button class="back-btn" onclick="showFeed()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
@@ -291,6 +379,8 @@ async function showProfile(userId) {
         <h2>${userData.username}</h2>
         <p class="handle">@${userData.username.toLowerCase()}</p>
         
+        ${userData.bio ? `<p class="bio" style="margin-top: 12px; color: var(--text); font-size: 15px; line-height: 1.5;">${userData.bio}</p>` : ""}
+
         <div class="profile-stats">
           <span><b>0</b> followers</span>
           <span><b>0</b> following</span>
@@ -320,16 +410,17 @@ async function showProfile(userId) {
       });
     }
     
-    window.onscroll = () => {
-      const st = window.pageYOffset || document.documentElement.scrollTop;
-      const nav = profileContainer.querySelector('.profile-nav-top');
-      if (nav) {
-        if (st > 150) nav.classList.add('active');
-        else nav.classList.remove('active');
-      }
-    };
+
+
+    // Wire up Edit Profile button
+    const editBtn = profileContent.querySelector('.btn-edit');
+    if (editBtn && isMe) {
+      editBtn.addEventListener('click', () => {
+        openSettings('account');
+      });
+    }
   } catch (err) {
-    profileContainer.innerHTML = `
+    profileContent.innerHTML = `
       <div style="padding: 100px 40px; text-align: center;">
         <h2 style="font-size: 24px; margin-bottom: 16px; color: #fff;">Profile Unavailable</h2>
         <p style="color: var(--muted); margin-bottom: 32px;">This user might have been deleted or never existed.</p>
@@ -362,6 +453,17 @@ if (postForm) {
       formData.append("content", content);
       if (selectedImageFile) formData.append("image", selectedImageFile);
 
+      // Add poll data if active
+      if (!pollCreator.classList.contains("hidden")) {
+        const question = pollQuestionInput.value.trim();
+        const optionInputs = pollOptionsContainer.querySelectorAll(".poll-option-input");
+        const options = Array.from(optionInputs).map(i => i.value.trim()).filter(v => v);
+        
+        if (question && options.length >= 2) {
+          formData.append("poll", JSON.stringify({ question, options }));
+        }
+      }
+
       const response = await fetch(`${API_URL}/posts`, {
         method: "POST",
         body: formData
@@ -374,6 +476,10 @@ if (postForm) {
       selectedImageFile = null;
       if (imageInput) imageInput.value = "";
       updateImagePreview(null);
+      
+      // Clear Poll
+      if (closePollButton) closePollButton.click();
+      
       await loadFeed();
     } catch (error) {
       showFeedback(error.message, "error");
@@ -398,6 +504,46 @@ if (removeImageButton) {
     selectedImageFile = null;
     imageInput.value = "";
     updateImagePreview(null);
+  });
+}
+
+// Poll Logic
+if (togglePollButton) {
+  togglePollButton.addEventListener("click", () => {
+    pollCreator.classList.toggle("hidden");
+    if (!pollCreator.classList.contains("hidden")) {
+      pollQuestionInput.focus();
+    }
+  });
+}
+
+if (closePollButton) {
+  closePollButton.addEventListener("click", () => {
+    pollCreator.classList.add("hidden");
+    // Clear inputs
+    pollQuestionInput.value = "";
+    const optionInputs = pollOptionsContainer.querySelectorAll(".poll-option-input");
+    optionInputs.forEach((input, index) => {
+      if (index < 2) input.value = "";
+      else input.remove();
+    });
+  });
+}
+
+if (addPollOptionButton) {
+  addPollOptionButton.addEventListener("click", () => {
+    const currentOptions = pollOptionsContainer.querySelectorAll(".poll-option-input");
+    if (currentOptions.length >= 4) {
+      showFeedback("Maximum 4 options allowed.", "info");
+      return;
+    }
+    const newInput = document.createElement("input");
+    newInput.type = "text";
+    newInput.className = "poll-option-input";
+    newInput.placeholder = `Option ${currentOptions.length + 1}`;
+    newInput.maxLength = 50;
+    pollOptionsContainer.appendChild(newInput);
+    newInput.focus();
   });
 }
 
@@ -582,6 +728,83 @@ async function toggleComments(postId, postElement) {
   } catch (err) {
     container.innerHTML = `<div style="padding: 10px; color: #f87171;">Failed to load comments.</div>`;
   }
+}
+
+// Settings Logic
+function openSettings(tab = "account") {
+  if (!currentUser) return;
+  settingsModal.classList.add("show");
+  settingsUsername.value = currentUser.username;
+  settingsBio.value = currentUser.bio || "";
+  settingsUserEmoji.textContent = currentUser.emoji;
+  switchSettingsTab(tab);
+}
+
+function switchSettingsTab(tabId) {
+  settingsNavItems.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabId);
+  });
+  settingsTabContents.forEach(content => {
+    content.classList.toggle("hidden", content.id !== `tab-${tabId}`);
+  });
+  settingsTabTitle.textContent = tabId.charAt(0).toUpperCase() + tabId.slice(1);
+}
+
+if (closeSettings) {
+  closeSettings.addEventListener("click", () => settingsModal.classList.remove("show"));
+}
+
+settingsModal.addEventListener("click", (e) => {
+  if (e.target === settingsModal) settingsModal.classList.remove("show");
+});
+
+settingsNavItems.forEach(btn => {
+  btn.addEventListener("click", () => switchSettingsTab(btn.dataset.tab));
+});
+
+if (saveProfile) {
+  saveProfile.addEventListener("click", async () => {
+    const username = settingsUsername.value.trim();
+    const bio = settingsBio.value.trim();
+    
+    if (!username) return showFeedback("Username is required", "error");
+
+    saveProfile.disabled = true;
+    saveProfile.textContent = "Saving...";
+
+    try {
+      const res = await fetch(`${API_URL}/auth/update-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, bio })
+      });
+
+      if (!res.ok) throw new Error(await getErrorMessage(res, "Update failed"));
+
+      showFeedback("Profile updated!", "success");
+      
+      // Update local state and UI
+      currentUser.username = username;
+      currentUser.bio = bio;
+      
+      const userNameDisplay = document.getElementById("userNameDisplay");
+      const userHandleDisplay = document.getElementById("userHandleDisplay");
+      if (userNameDisplay) userNameDisplay.textContent = username;
+      if (userHandleDisplay) userHandleDisplay.textContent = `@${username.toLowerCase()}`;
+      
+      // If we are on the profile page, refresh it
+      if (!profileView.classList.contains("hidden")) {
+        showProfile(currentUser.id);
+      }
+      
+      settingsModal.classList.remove("show");
+    } catch (err) {
+      showFeedback(err.message, "error");
+    } finally {
+      saveProfile.disabled = false;
+      saveProfile.textContent = "Save Changes";
+    }
+  });
 }
 
 (async function init() {

@@ -70,13 +70,27 @@
               
               <div class="composer-bottom">
                 <div class="composer-tools">
-                  <span id="pickImageButton">📎</span>
+                  <span id="pickImageButton" title="Add Image">📎</span>
                   <span>😊</span>
                   <span>🎨</span>
-                  <span>📊</span>
+                  <span id="togglePollButton" title="Add Poll">📊</span>
                 </div>
                 <input id="imageInput" type="file" accept="image/*" hidden />
                 <button type="submit" class="send">Post</button>
+              </div>
+
+              <!-- Poll Creator Box -->
+              <div id="pollCreator" class="poll-creator hidden">
+                <div class="poll-creator-header">
+                  <span>Poll</span>
+                  <button type="button" id="closePollButton" class="close-poll-btn">&times;</button>
+                </div>
+                <input type="text" id="pollQuestion" placeholder="Poll question" maxlength="100" />
+                <div id="pollOptionsContainer" class="poll-options-container">
+                  <input type="text" class="poll-option-input" placeholder="Option 1" maxlength="50" />
+                  <input type="text" class="poll-option-input" placeholder="Option 2" maxlength="50" />
+                </div>
+                <button type="button" id="addPollOption" class="add-option-btn">+ Add option</button>
               </div>
 
               <div id="imagePreviewBox" class="image-preview-box hidden" style="margin-top: 15px;">
@@ -126,6 +140,80 @@
     <div class="modal-close" id="modalClose">&times;</div>
     <div class="modal-content">
       <img id="modalImage" alt="Expanded View" />
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="settings-modal">
+    <div class="settings-container">
+      <div class="settings-sidebar">
+        <div class="settings-title">Настройки</div>
+        <nav class="settings-nav">
+          <button class="settings-nav-item active" data-tab="account">
+            <span class="ico">👤</span> Account
+          </button>
+          <button class="settings-nav-item" data-tab="design">
+            <span class="ico">🎨</span> Design
+          </button>
+          <button class="settings-nav-item" data-tab="security">
+            <span class="ico">🛡️</span> Security
+          </button>
+          <button class="settings-nav-item" data-tab="privacy">
+            <span class="ico">✋</span> Privacy
+          </button>
+          <button class="settings-nav-item" data-tab="notifications">
+            <span class="ico">🔔</span> Notifications
+          </button>
+        </nav>
+      </div>
+
+      <div class="settings-content">
+        <div class="settings-header">
+          <h2 id="settingsTabTitle">Account</h2>
+          <button id="closeSettings" class="settings-close">&times;</button>
+        </div>
+
+        <!-- Account Tab -->
+        <div id="tab-account" class="settings-tab-content">
+          <div class="settings-group">
+            <div class="settings-field-header">
+              <div class="settings-label">Эмоджи-клан</div>
+              <div class="settings-hint">Выбран при регистрации. Изменить нельзя</div>
+            </div>
+            <div class="settings-emoji-display" id="settingsUserEmoji">👻</div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">Username</div>
+            <div class="settings-hint">Ваш уникальный идентификатор</div>
+            <input type="text" id="settingsUsername" class="settings-input" placeholder="username" />
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">О себе</div>
+            <div class="settings-hint">Расскажите немного о себе</div>
+            <textarea id="settingsBio" class="settings-input" rows="4" placeholder="Напиши что-нибудь о себе..."></textarea>
+          </div>
+
+          <div class="settings-footer">
+            <button id="saveProfile" class="primary-btn" style="padding: 12px 32px;">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- Placeholder for other tabs -->
+        <div id="tab-design" class="settings-tab-content hidden">
+          <div class="settings-placeholder">Design settings coming soon...</div>
+        </div>
+        <div id="tab-security" class="settings-tab-content hidden">
+          <div class="settings-placeholder">Security settings coming soon...</div>
+        </div>
+        <div id="tab-privacy" class="settings-tab-content hidden">
+          <div class="settings-placeholder">Privacy settings coming soon...</div>
+        </div>
+        <div id="tab-notifications" class="settings-tab-content hidden">
+          <div class="settings-placeholder">Notification settings coming soon...</div>
+        </div>
+      </div>
     </div>
   </div>
 

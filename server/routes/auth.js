@@ -53,7 +53,7 @@ router.post("/login", (req, res, next) => {
 
     req.session.userId = user.id;
     req.session.userEmoji = user.emoji;
-    res.json({ message: "Logged in successfully", user: { id: user.id, username: user.username, emoji: user.emoji } });
+    res.json({ message: "Logged in successfully", user: { id: user.id, username: user.username, emoji: user.emoji, bio: user.bio } });
   });
 });
 
@@ -73,9 +73,13 @@ router.get("/me", (req, res) => {
   }
 
   const db = req.app.locals.db;
-  db.get("SELECT id, username, emoji FROM users WHERE id = ?", [req.session.userId], (err, user) => {
+  // Use SELECT * to avoid "no such column" error if migration is still running, 
+  // though bio is expected now.
+  db.get("SELECT * FROM users WHERE id = ?", [req.session.userId], (err, user) => {
     if (err || !user) return res.status(401).json({ error: "User not found" });
-    res.json({ user });
+    // Strip password
+    const { password_hash, ...safeUser } = user;
+    res.json({ user: safeUser });
   });
 });
 
@@ -83,10 +87,33 @@ router.get("/me", (req, res) => {
 router.get("/users/:id", (req, res, next) => {
   const db = req.app.locals.db;
   const userId = Number(req.params.id);
-  db.get("SELECT id, username, emoji, created_at FROM users WHERE id = ?", [userId], (err, user) => {
+  db.get("SELECT * FROM users WHERE id = ?", [userId], (err, user) => {
     if (err) return next(err);
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ user });
+    const { password_hash, ...safeUser } = user;
+    res.json({ user: safeUser });
+  });
+});
+
+// Update Profile Route
+router.post("/update-profile", (req, res, next) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not logged in" });
+  
+  const { username, bio } = req.body;
+  const db = req.app.locals.db;
+  const userId = req.session.userId;
+
+  if (!username) return res.status(400).json({ error: "Username is required" });
+
+  const query = `UPDATE users SET username = ?, bio = ? WHERE id = ?`;
+  db.run(query, [username.toLowerCase(), bio || "", userId], function(err) {
+    if (err) {
+      if (err.message.includes("UNIQUE constraint failed")) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+      return next(err);
+    }
+    res.json({ message: "Profile updated successfully" });
   });
 });
 

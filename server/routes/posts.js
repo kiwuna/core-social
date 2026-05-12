@@ -36,22 +36,54 @@ const upload = multer({
 router.get("/", (req, res, next) => {
   const db = req.app.locals.db;
   const currentUserId = req.session.userId || 0;
-  
+
   const query = `
     SELECT 
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
       COALESCE(u.emoji, '👻') as emoji,
       COALESCE(u.username, 'anonymous') as username,
       EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked,
-      (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
+      (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+      pl.id as poll_id, pl.question as poll_question
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
+    LEFT JOIN polls pl ON pl.post_id = p.id
     ORDER BY p.id DESC
   `;
 
   db.all(query, [currentUserId], (error, rows) => {
     if (error) return next(error);
-    res.json(rows);
+    
+    // For each post, if it has a poll, fetch its options and votes
+    const fetchPolls = rows.map(post => {
+      if (!post.poll_id) return Promise.resolve(post);
+      
+      return new Promise((resolve, reject) => {
+        const optionsQuery = `
+          SELECT 
+            po.id, po.option_text,
+            (SELECT COUNT(*) FROM poll_votes WHERE option_id = po.id) as vote_count,
+            EXISTS(SELECT 1 FROM poll_votes WHERE poll_id = ? AND user_id = ? AND option_id = po.id) as user_voted
+          FROM poll_options po
+          WHERE po.poll_id = ?
+        `;
+        db.all(optionsQuery, [post.poll_id, currentUserId, post.poll_id], (err, options) => {
+          if (err) return reject(err);
+          post.poll = {
+            id: post.poll_id,
+            question: post.poll_question,
+            options: options,
+            total_votes: options.reduce((sum, opt) => sum + opt.vote_count, 0),
+            user_has_voted: options.some(opt => opt.user_voted)
+          };
+          resolve(post);
+        });
+      });
+    });
+
+    Promise.all(fetchPolls)
+      .then(results => res.json(results))
+      .catch(err => next(err));
   });
 });
 
@@ -67,16 +99,48 @@ router.get("/user/:userId", (req, res, next) => {
       COALESCE(u.emoji, '👻') as emoji,
       COALESCE(u.username, 'anonymous') as username,
       EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked,
-      (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
+      (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+      pl.id as poll_id, pl.question as poll_question
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
+    LEFT JOIN polls pl ON pl.post_id = p.id
     WHERE p.user_id = ?
     ORDER BY p.id DESC
   `;
 
   db.all(query, [currentUserId, userId], (error, rows) => {
     if (error) return next(error);
-    res.json(rows);
+    
+    // For each post, if it has a poll, fetch its options and votes
+    const fetchPolls = rows.map(post => {
+      if (!post.poll_id) return Promise.resolve(post);
+      
+      return new Promise((resolve, reject) => {
+        const optionsQuery = `
+          SELECT 
+            po.id, po.option_text,
+            (SELECT COUNT(*) FROM poll_votes WHERE option_id = po.id) as vote_count,
+            EXISTS(SELECT 1 FROM poll_votes WHERE poll_id = ? AND user_id = ? AND option_id = po.id) as user_voted
+          FROM poll_options po
+          WHERE po.poll_id = ?
+        `;
+        db.all(optionsQuery, [post.poll_id, currentUserId, post.poll_id], (err, options) => {
+          if (err) return reject(err);
+          post.poll = {
+            id: post.poll_id,
+            question: post.poll_question,
+            options: options,
+            total_votes: options.reduce((sum, opt) => sum + opt.vote_count, 0),
+            user_has_voted: options.some(opt => opt.user_voted)
+          };
+          resolve(post);
+        });
+      });
+    });
+
+    Promise.all(fetchPolls)
+      .then(results => res.json(results))
+      .catch(err => next(err));
   });
 });
 
@@ -87,9 +151,19 @@ router.post("/", isAuthenticated, upload.single("image"), (req, res, next) => {
   const content = rawContent.trim();
   const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
   const userId = req.session.userId;
+  
+  // Poll data
+  let pollData = null;
+  if (req.body.poll) {
+    try {
+      pollData = JSON.parse(req.body.poll);
+    } catch (e) {
+      return res.status(400).json({ error: "Invalid poll data." });
+    }
+  }
 
-  if (!content && !imagePath) {
-    return res.status(400).json({ error: "Post must contain text or an image." });
+  if (!content && !imagePath && !pollData) {
+    return res.status(400).json({ error: "Post must contain text, an image, or a poll." });
   }
 
   if (content.length > MAX_POST_LENGTH) {
@@ -98,21 +172,123 @@ router.post("/", isAuthenticated, upload.single("image"), (req, res, next) => {
     });
   }
 
-  const query = `INSERT INTO posts (content, image_path, user_id) VALUES (?, ?, ?)`;
-  db.run(query, [content, imagePath, userId], function onInsert(error) {
-    if (error) return next(error);
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
 
-    const createdPost = {
-      id: this.lastID,
-      content,
-      likes: 0,
-      image_path: imagePath,
-      user_id: userId,
-      emoji: req.session.userEmoji,
-      created_at: new Date().toISOString()
-    };
+    const query = `INSERT INTO posts (content, image_path, user_id) VALUES (?, ?, ?)`;
+    db.run(query, [content, imagePath, userId], function onInsert(error) {
+      if (error) {
+        db.run("ROLLBACK");
+        return next(error);
+      }
 
-    res.status(201).json(createdPost);
+      const postId = this.lastID;
+
+      if (pollData && pollData.question && pollData.options && pollData.options.length >= 2) {
+        db.run(`INSERT INTO polls (post_id, question) VALUES (?, ?)`, [postId, pollData.question], function(pollErr) {
+          if (pollErr) {
+            db.run("ROLLBACK");
+            return next(pollErr);
+          }
+          
+          const pollId = this.lastID;
+          const optionQueries = pollData.options.map(opt => {
+            return new Promise((resolve, reject) => {
+              db.run(`INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)`, [pollId, opt], (optErr) => {
+                if (optErr) reject(optErr);
+                else resolve();
+              });
+            });
+          });
+
+          Promise.all(optionQueries)
+            .then(() => {
+              db.run("COMMIT");
+              res.status(201).json({
+                id: postId,
+                content,
+                likes: 0,
+                image_path: imagePath,
+                user_id: userId,
+                emoji: req.session.userEmoji,
+                created_at: new Date().toISOString(),
+                poll: { ...pollData, id: pollId, options: pollData.options.map(o => ({ option_text: o, vote_count: 0, user_voted: false })), total_votes: 0, user_has_voted: false }
+              });
+            })
+            .catch(err => {
+              db.run("ROLLBACK");
+              next(err);
+            });
+        });
+      } else {
+        db.run("COMMIT");
+        res.status(201).json({
+          id: postId,
+          content,
+          likes: 0,
+          image_path: imagePath,
+          user_id: userId,
+          emoji: req.session.userEmoji,
+          created_at: new Date().toISOString()
+        });
+      }
+    });
+  });
+});
+
+// Vote on a poll (Protected)
+router.post("/:id/vote", isAuthenticated, (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+  const userId = req.session.userId;
+  const { optionId } = req.body;
+
+  if (!optionId) return res.status(400).json({ error: "Option ID is required." });
+
+  // Get poll ID for this post
+  db.get(`SELECT id FROM polls WHERE post_id = ?`, [postId], (err, poll) => {
+    if (err) return next(err);
+    if (!poll) return res.status(404).json({ error: "Poll not found for this post." });
+
+    const pollId = poll.id;
+
+    // Check if user already voted
+    db.get(`SELECT id FROM poll_votes WHERE poll_id = ? AND user_id = ?`, [pollId, userId], (voteErr, vote) => {
+      if (voteErr) return next(voteErr);
+      if (vote) return res.status(400).json({ error: "You have already voted on this poll." });
+
+      // Record vote
+      db.run(`INSERT INTO poll_votes (poll_id, option_id, user_id) VALUES (?, ?, ?)`, [pollId, optionId, userId], (insertErr) => {
+        if (insertErr) return next(insertErr);
+
+        // Fetch updated poll data
+        const optionsQuery = `
+          SELECT 
+            po.id, po.option_text,
+            (SELECT COUNT(*) FROM poll_votes WHERE option_id = po.id) as vote_count,
+            EXISTS(SELECT 1 FROM poll_votes WHERE poll_id = ? AND user_id = ? AND option_id = po.id) as user_voted
+          FROM poll_options po
+          WHERE po.poll_id = ?
+        `;
+        db.all(optionsQuery, [pollId, userId, pollId], (err, options) => {
+          if (err) return next(err);
+          
+          // Get question too
+          db.get(`SELECT question FROM polls WHERE id = ?`, [pollId], (qErr, pollRow) => {
+            if (qErr) return next(qErr);
+            res.json({
+              poll: {
+                id: pollId,
+                question: pollRow.question,
+                options: options,
+                total_votes: options.reduce((sum, opt) => sum + opt.vote_count, 0),
+                user_has_voted: true
+              }
+            });
+          });
+        });
+      });
+    });
   });
 });
 

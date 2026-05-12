@@ -31,6 +31,7 @@ const closeSettings = document.getElementById("closeSettings");
 const saveProfile = document.getElementById("saveProfile");
 const settingsNavItems = document.querySelectorAll(".settings-nav-item");
 const settingsTabContents = document.querySelectorAll(".settings-tab-content");
+const settingsDisplayName = document.getElementById("settingsDisplayName");
 const settingsUsername = document.getElementById("settingsUsername");
 const settingsBio = document.getElementById("settingsBio");
 const settingsUserEmoji = document.getElementById("settingsUserEmoji");
@@ -57,6 +58,7 @@ const searchView = document.getElementById("searchView");
 const navFeed = document.getElementById("navFeed");
 const navSearch = document.getElementById("navSearch");
 const navProfile = document.getElementById("navProfile");
+const navCoreFlow = document.getElementById("navCoreFlow");
 
 // Search Elements
 const searchInput = document.getElementById("searchInput");
@@ -86,6 +88,26 @@ let currentUser = null;
 const pendingPostActions = new Set();
 let selectedImageFile = null;
 let selectedImagePreviewUrl = "";
+let selectedFont = "default";
+
+// Core Flow elements
+const fontStylePicker = document.getElementById("fontStylePicker");
+const fontBtns = document.querySelectorAll(".font-btn");
+const avatarFileInput = document.getElementById("avatarFileInput");
+const avatarPreview = document.getElementById("avatarPreview");
+const removeAvatarBtn = document.getElementById("removeAvatarBtn");
+const avatarUploadArea = document.getElementById("avatarUploadArea");
+const avatarLockedMsg = document.getElementById("avatarLockedMsg");
+
+const bannerFileInput = document.getElementById("bannerFileInput");
+const bannerPreview = document.getElementById("bannerPreview");
+const removeBannerBtn = document.getElementById("removeBannerBtn");
+const bannerUploadArea = document.getElementById("bannerUploadArea");
+const bannerLockedMsg = document.getElementById("bannerLockedMsg");
+const activateCoreFlowBtn = document.getElementById("activateCoreFlow");
+const coreFlowModal = document.getElementById("coreFlowModal");
+const closeCoreFlow = document.getElementById("closeCoreFlow");
+const activateCoreFlowModal = document.getElementById("activateCoreFlowModal");
 
 function showFeedback(message, type = "info") {
   if (!feedbackMessage) return;
@@ -133,17 +155,76 @@ function updateImagePreview(file) {
 
 function updateAuthUI() {
   if (currentUser) {
-    userNameDisplay.textContent = currentUser.username;
+    userNameDisplay.textContent = currentUser.display_name || currentUser.username;
+    userNameDisplay.classList.toggle('premium-name-gradient', !!currentUser.is_premium);
     userHandleDisplay.textContent = `@${currentUser.username.toLowerCase()}`;
     userEmojiLarge.textContent = currentUser.emoji;
-    if (userEmojiMini) userEmojiMini.textContent = currentUser.emoji;
+    if (userEmojiMini) {
+      if (currentUser.is_premium && currentUser.avatar_path) {
+        userEmojiMini.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      } else {
+        userEmojiMini.textContent = currentUser.emoji;
+      }
+      // Round avatar for premium users
+      userEmojiMini.classList.toggle('round-avatar', !!currentUser.is_premium);
+    }
+    // Show font picker for premium users
+    if (fontStylePicker) fontStylePicker.classList.toggle('hidden', !currentUser.is_premium);
+
+    // Update settings modal premium states
+    const isPremium = !!currentUser.is_premium;
+
+    if (avatarUploadArea) {
+      avatarUploadArea.classList.toggle('locked', !isPremium);
+      avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+    }
+    if (avatarLockedMsg) avatarLockedMsg.classList.toggle('hidden', isPremium);
+
+    if (bannerUploadArea) {
+      bannerUploadArea.classList.toggle('locked', !isPremium);
+      bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+    }
+    if (bannerLockedMsg) bannerLockedMsg.classList.toggle('hidden', isPremium);
+
+    if (avatarPreview) {
+      if (isPremium && currentUser.avatar_path) {
+        avatarPreview.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      } else {
+        avatarPreview.textContent = currentUser.emoji;
+      }
+    }
+
+    // Sidebar Core Flow link state
+    if (navCoreFlow) {
+      navCoreFlow.classList.toggle('coreflow-active', !!currentUser.is_premium);
+      if (currentUser.is_premium) {
+        navCoreFlow.style.color = '#60a5fa'; // Premium Blue
+        navCoreFlow.querySelector('span:last-child').textContent = 'CORE FLOW';
+      } else {
+        navCoreFlow.style.color = '';
+        navCoreFlow.querySelector('span:last-child').textContent = 'UPGRADE';
+      }
+    }
+
     logoutBtn.classList.remove("hidden");
     loginLink.classList.add("hidden");
   } else {
     userNameDisplay.textContent = "Profile";
     userHandleDisplay.textContent = "@anonymous";
     userEmojiLarge.textContent = "👤";
-    if (userEmojiMini) userEmojiMini.textContent = "👻";
+    if (userEmojiMini) {
+      userEmojiMini.textContent = "👻";
+      userEmojiMini.classList.remove('premium-ring', 'round-avatar');
+    }
+    if (fontStylePicker) fontStylePicker.classList.add('hidden');
+    if (avatarUploadArea) avatarUploadArea.classList.add('hidden');
+    if (avatarLockedMsg) avatarLockedMsg.classList.add('hidden');
+    if (navCoreFlow) {
+      navCoreFlow.classList.remove('coreflow-active');
+      navCoreFlow.style.color = '';
+      navCoreFlow.querySelector('span:last-child').textContent = 'CORE FLOW';
+    }
+    
     logoutBtn.classList.add("hidden");
     loginLink.classList.remove("hidden");
   }
@@ -170,19 +251,29 @@ function createPostElement(post) {
   postElement.className = "post";
   postElement.dataset.postId = String(post.id);
 
-  const createdAt = post.created_at
-    ? timeAgo(new Date(post.created_at))
-    : "just now";
-
+  const createdAt = post.created_at ? timeAgo(new Date(post.created_at)) : "just now";
   const displayEmoji = post.emoji || "👻";
-  const displayUser = post.username || "anonymous";
+  const displayUser = post.display_name || post.username || "anonymous";
   const isOwner = currentUser && post.user_id === currentUser.id;
+  const isPremiumPost = !!post.is_premium;
+
+  // Avatar: custom image or emoji
+  const avatarInner = (isPremiumPost && post.avatar_path)
+    ? `<img src="${post.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`
+    : displayEmoji;
+
+  // Verified badge
+  const verifiedBadge = isPremiumPost
+    ? `<span class="verified-check" title="Core Flow"></span>`
+    : '';
 
   postElement.innerHTML = `
     <div class="post-head">
-      <div class="mini-avatar" style="cursor:pointer" data-user-id="${post.user_id}">${displayEmoji}</div>
+      <div class="mini-avatar" style="cursor:pointer" data-user-id="${post.user_id}">${avatarInner}</div>
       <div class="post-user-info" style="cursor:pointer" data-user-id="${post.user_id}">
-        <h3>${displayUser}</h3>
+        <h3 style="display:flex;align-items:center;gap:4px;">
+          <span class="${isPremiumPost ? 'premium-name-gradient' : ''}">${displayUser}</span>${verifiedBadge}
+        </h3>
         <span class="meta">${createdAt}</span>
       </div>
       <div class="post-more">⋯</div>
@@ -207,12 +298,17 @@ function createPostElement(post) {
     <div class="comments-container hidden"></div>
   `;
 
-  // Go to profile on avatar/name click
+  // Apply font style to post body
+  const postBody = postElement.querySelector(".post-body");
+  postBody.textContent = post.content;
+  if (post.font_style && post.font_style !== 'default') {
+    postBody.classList.add(`font-${post.font_style}`);
+  }
+
   postElement.querySelectorAll('[data-user-id]').forEach(el => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       const uid = el.dataset.userId;
-      // Safety check for legacy posts, anonymous, or deleted users
       if (uid && uid !== "null" && uid !== "undefined" && displayUser !== "anonymous") {
          showProfile(uid);
       } else {
@@ -370,19 +466,23 @@ async function showProfile(userId) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
         </button>
         <div class="mini-profile-info">
-          <span class="mini-name">${userData.username}</span>
+          <span class="mini-name ${userData.is_premium ? 'premium-name-gradient' : ''}">${userData.display_name || userData.username}</span>
           <span class="mini-meta">${userPosts.length} posts</span>
         </div>
       </div>
       <div class="profile-header">
-        <div class="profile-banner">
+        <div class="profile-banner" style="${userData.is_premium && userData.banner_path ? `background-image: url(${userData.banner_path}?v=${Date.now()}) !important; background-size: cover; background-position: center;` : ''}">
           <div style="position: absolute; bottom: 20px; right: 20px;">
-             <button class="btn-pill btn-secondary">🎨 Theme</button>
+             <button class="btn-pill btn-secondary" onclick="openSettings('design')">🎨 Theme</button>
           </div>
         </div>
         <div class="profile-avatar-area">
-          <div class="large-avatar-wrap">
-            <div class="large-avatar">${userData.emoji}</div>
+          <div class="large-avatar-wrap ${userData.is_premium ? 'round-avatar' : ''}">
+            <div class="large-avatar">
+              ${(userData.is_premium && userData.avatar_path) 
+                ? `<img src="${userData.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+                : userData.emoji}
+            </div>
             <div class="status-indicator"></div>
           </div>
           <div class="profile-actions">
@@ -394,7 +494,10 @@ async function showProfile(userId) {
       </div>
       
       <div class="profile-info">
-        <h2>${userData.username}</h2>
+        <h2 style="display:flex;align-items:center;gap:8px;">
+          <span class="${userData.is_premium ? 'premium-name-gradient' : ''}">${userData.display_name || userData.username}</span>
+          ${userData.is_premium ? `<span class="verified-check" title="Core Flow" style="width:22px;height:22px;"></span>` : ''}
+        </h2>
         <p class="handle">@${userData.username.toLowerCase()}</p>
         
         ${userData.bio ? `<p class="bio" style="margin-top: 12px; color: var(--text); font-size: 15px; line-height: 1.5;">${userData.bio}</p>` : ""}
@@ -416,7 +519,7 @@ async function showProfile(userId) {
         </div>
       </div>
 
-      <div id="profilePosts" style="padding: 24px 40px;"></div>
+      <div id="profilePosts" style="padding: 24px;"></div>
     `;
 
     const profilePosts = document.getElementById("profilePosts");
@@ -663,6 +766,11 @@ if (postForm) {
         }
       }
 
+      // Add font style for premium users
+      if (currentUser && currentUser.is_premium) {
+        formData.append("font_style", selectedFont);
+      }
+
       const response = await fetch(`${API_URL}/posts`, {
         method: "POST",
         body: formData
@@ -872,7 +980,7 @@ async function toggleComments(postId, postElement) {
         <div class="comment">
           <div class="mini-avatar">${c.emoji}</div>
           <div class="comment-bubble">
-            <span class="author">${c.username}</span>
+            <span class="author">${c.display_name || c.username}</span>
             <div class="text">${c.content}</div>
           </div>
         </div>
@@ -935,8 +1043,27 @@ function openSettings(tab = "account") {
   if (!currentUser) return;
   settingsModal.classList.add("show");
   settingsUsername.value = currentUser.username;
+  if (settingsDisplayName) settingsDisplayName.value = currentUser.display_name || "";
   settingsBio.value = currentUser.bio || "";
   settingsUserEmoji.textContent = currentUser.emoji;
+
+  // Initialize previews
+  if (currentUser.avatar_path && avatarPreview) {
+    avatarPreview.innerHTML = `<img src="${currentUser.avatar_path}" />`;
+    if (removeAvatarBtn) removeAvatarBtn.classList.remove("hidden");
+  } else if (avatarPreview) {
+    avatarPreview.innerHTML = currentUser.emoji;
+    if (removeAvatarBtn) removeAvatarBtn.classList.add("hidden");
+  }
+
+  if (currentUser.banner_path && bannerPreview) {
+    bannerPreview.innerHTML = `<img src="${currentUser.banner_path}" />`;
+    if (removeBannerBtn) removeBannerBtn.classList.remove("hidden");
+  } else if (bannerPreview) {
+    bannerPreview.innerHTML = `<div class="banner-placeholder">Banner Preview</div>`;
+    if (removeBannerBtn) removeBannerBtn.classList.add("hidden");
+  }
+
   switchSettingsTab(tab);
 }
 
@@ -948,6 +1075,21 @@ function switchSettingsTab(tabId) {
     content.classList.toggle("hidden", content.id !== `tab-${tabId}`);
   });
   settingsTabTitle.textContent = tabId.charAt(0).toUpperCase() + tabId.slice(1);
+
+  // Lock premium features
+  const isPremium = currentUser && !!currentUser.is_premium;
+  
+  if (avatarUploadArea) {
+    avatarUploadArea.classList.toggle('locked', !isPremium);
+    avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+  }
+  if (avatarLockedMsg) avatarLockedMsg.classList.toggle('hidden', isPremium);
+  
+  if (bannerUploadArea) {
+    bannerUploadArea.classList.toggle('locked', !isPremium);
+    bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+  }
+  if (bannerLockedMsg) bannerLockedMsg.classList.toggle('hidden', isPremium);
 }
 
 if (closeSettings) {
@@ -965,6 +1107,7 @@ settingsNavItems.forEach(btn => {
 if (saveProfile) {
   saveProfile.addEventListener("click", async () => {
     const username = settingsUsername.value.trim();
+    const display_name = settingsDisplayName ? settingsDisplayName.value.trim() : "";
     const bio = settingsBio.value.trim();
     
     if (!username) return showFeedback("Username is required", "error");
@@ -976,7 +1119,7 @@ if (saveProfile) {
       const res = await fetch(`${API_URL}/auth/update-profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, bio })
+        body: JSON.stringify({ username, display_name, bio })
       });
 
       if (!res.ok) throw new Error(await getErrorMessage(res, "Update failed"));
@@ -985,12 +1128,10 @@ if (saveProfile) {
       
       // Update local state and UI
       currentUser.username = username;
+      currentUser.display_name = display_name;
       currentUser.bio = bio;
       
-      const userNameDisplay = document.getElementById("userNameDisplay");
-      const userHandleDisplay = document.getElementById("userHandleDisplay");
-      if (userNameDisplay) userNameDisplay.textContent = username;
-      if (userHandleDisplay) userHandleDisplay.textContent = `@${username.toLowerCase()}`;
+      updateAuthUI();
       
       // If we are on the profile page, refresh it
       if (!profileView.classList.contains("hidden")) {
@@ -1003,6 +1144,269 @@ if (saveProfile) {
     } finally {
       saveProfile.disabled = false;
       saveProfile.textContent = "Save Changes";
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// Core Flow (Premium) Logic
+// ═══════════════════════════════════════
+
+// Font Selection logic
+if (fontBtns) {
+  fontBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      fontBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedFont = btn.dataset.font;
+      
+      // Visual feedback in input
+      postInput.className = '';
+      if (selectedFont !== 'default') {
+        postInput.classList.add(`font-${selectedFont}`);
+      }
+    });
+  });
+}
+
+// Activate Core Flow logic
+if (activateCoreFlowBtn) {
+  activateCoreFlowBtn.addEventListener('click', async () => {
+    if (!currentUser) return;
+    
+    activateCoreFlowBtn.disabled = true;
+    activateCoreFlowBtn.textContent = 'Activating...';
+    
+    try {
+      const res = await fetch(`${API_URL}/auth/activate-premium`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        showFeedback(data.message, 'success');
+        
+        // Refresh user data
+        await fetchCurrentUser();
+        
+        // Refresh feed to show new styles
+        await loadFeed();
+        
+        // Close settings or switch tab
+        switchSettingsTab('account');
+      } else {
+        showFeedback('Activation failed. Please try again.', 'error');
+      }
+    } catch (err) {
+      showFeedback('Error activating Core Flow', 'error');
+    } finally {
+      activateCoreFlowBtn.disabled = false;
+      activateCoreFlowBtn.textContent = 'Activate';
+    }
+  });
+}
+
+// Avatar Upload logic
+if (avatarFileInput) {
+  avatarFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!currentUser || !currentUser.is_premium) {
+      showFeedback('Custom avatars require Core Flow.', 'info');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+      showFeedback('Uploading avatar...', 'info');
+      const res = await fetch(`${API_URL}/auth/upload-avatar`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        currentUser.avatar_path = data.avatar_path;
+        updateAuthUI();
+        
+        // Update preview in settings
+        if (avatarPreview) {
+          avatarPreview.innerHTML = `<img src="${data.avatar_path}" />`;
+        }
+        if (removeAvatarBtn) removeAvatarBtn.classList.remove('hidden');
+        
+        showFeedback('Avatar updated!', 'success');
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || 'Upload failed', 'error');
+      }
+    } catch (err) {
+      showFeedback('Error uploading avatar', 'error');
+    }
+  });
+}
+
+if (removeAvatarBtn) {
+  removeAvatarBtn.addEventListener('click', async () => {
+    // Logic to remove avatar could be added here
+  });
+}
+// Banner Upload logic
+if (bannerFileInput) {
+  bannerFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!currentUser || !currentUser.is_premium) {
+      showFeedback('Custom banners require Core Flow.', 'info');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('banner', file);
+
+    try {
+      showFeedback('Uploading banner...', 'info');
+      
+      const res = await fetch(`${API_URL}/auth/upload-banner`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        currentUser.banner_path = data.banner_path;
+        
+        // Update preview in settings
+        if (bannerPreview) {
+          bannerPreview.innerHTML = `<img src="${data.banner_path}?v=${Date.now()}" />`;
+        }
+        if (removeBannerBtn) removeBannerBtn.classList.remove('hidden');
+        
+        showFeedback('Banner updated successfully!', 'success');
+        
+        // Reset input so same file can be picked again
+        bannerFileInput.value = '';
+
+        // Refresh profile if visible
+        if (!profileView.classList.contains("hidden") && currentUser) {
+          showProfile(currentUser.id);
+        }
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || 'Upload failed', 'error');
+        bannerFileInput.value = '';
+      }
+    } catch (err) {
+      showFeedback('Error uploading banner', 'error');
+      bannerFileInput.value = '';
+    }
+  });
+}
+
+
+
+if (removeBannerBtn) {
+  removeBannerBtn.addEventListener('click', async () => {
+    if (!confirm('Remove your custom banner?')) return;
+    try {
+      const res = await fetch(`${API_URL}/auth/remove-banner`, { method: 'POST' });
+      if (res.ok) {
+        currentUser.banner_path = null;
+        bannerPreview.innerHTML = `<div class="banner-placeholder">Banner Preview</div>`;
+        removeBannerBtn.classList.add('hidden');
+        showFeedback('Banner removed', 'success');
+        if (!profileView.classList.contains("hidden") && currentUser) {
+          showProfile(currentUser.id);
+        }
+      }
+    } catch (err) {
+      showFeedback('Error removing banner', 'error');
+    }
+  });
+}
+
+// Navigation Listeners
+navFeed.addEventListener("click", (e) => { e.preventDefault(); showFeed(); });
+if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); showSearchView(); });
+navProfile.addEventListener("click", (e) => { 
+  e.preventDefault(); 
+  if (currentUser) showProfile(currentUser.id); 
+  else window.location.href = "login.html";
+});
+
+// Core Flow Sidebar Link
+if (navCoreFlow) {
+  navCoreFlow.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      window.location.href = "login.html";
+      return;
+    }
+    // If already premium, show account settings, otherwise show the new upgrade modal
+    if (currentUser.is_premium) {
+      openSettings('account');
+    } else {
+      if (coreFlowModal) coreFlowModal.classList.add('show');
+    }
+  });
+}
+
+// Core Flow Modal Logic
+if (closeCoreFlow) {
+  closeCoreFlow.addEventListener("click", () => coreFlowModal.classList.remove("show"));
+}
+
+if (coreFlowModal) {
+  coreFlowModal.addEventListener("click", (e) => {
+    if (e.target === coreFlowModal) coreFlowModal.classList.remove("show");
+  });
+}
+
+if (activateCoreFlowModal) {
+  activateCoreFlowModal.addEventListener('click', async () => {
+    if (!currentUser) return;
+    
+    activateCoreFlowModal.disabled = true;
+    activateCoreFlowModal.textContent = 'Activating...';
+    
+    try {
+      const res = await fetch("/auth/activate-premium", { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        showFeedback(data.message, 'success');
+        
+        // Update local user state immediately
+        if (currentUser) {
+          currentUser.is_premium = 1;
+        }
+        updateAuthUI();
+        
+        // Refresh full user data
+        await fetchCurrentUser();
+        
+        // Refresh feed to show new styles
+        await loadFeed();
+        
+        // Close modal
+        setTimeout(() => {
+           if (coreFlowModal) coreFlowModal.classList.remove('show');
+        }, 1500);
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || 'Activation failed. Are you logged in?', 'error');
+        console.error("Activation failed:", err);
+      }
+    } catch (err) {
+      showFeedback('Network error during activation. Check server.', 'error');
+      console.error("Network error:", err);
+    } finally {
+      activateCoreFlowModal.disabled = false;
+      activateCoreFlowModal.textContent = 'Activate Core Flow';
     }
   });
 }

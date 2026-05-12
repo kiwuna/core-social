@@ -31,7 +31,7 @@
       </nav>
 
       <div class="sidebar-footer">
-        <a href="#" class="footer-link"><span class="ico">⭐</span> <span>CORE PRO</span></a>
+        <a href="#" id="navCoreFlow" class="footer-link"><span class="ico">⭐</span> <span>CORE FLOW</span></a>
         <a href="#" id="logoutBtn" class="footer-link hidden"><span class="ico">🚪</span> <span>Logout</span></a>
         <a href="login.html" id="loginLink" class="footer-link"><span class="ico">🔑</span> <span>Login</span></a>
       </div>
@@ -76,6 +76,13 @@
                   <span id="togglePollButton" title="Add Poll">📊</span>
                 </div>
                 <input id="imageInput" type="file" accept="image/*" hidden />
+                <!-- Font Style Picker (Core Flow only) -->
+                <div id="fontStylePicker" class="font-style-picker hidden">
+                  <button type="button" class="font-btn active" data-font="default" title="Default">Aa</button>
+                  <button type="button" class="font-btn" data-font="serif" title="Serif">𝐒</button>
+                  <button type="button" class="font-btn" data-font="mono" title="Monospace">⌨</button>
+                  <button type="button" class="font-btn" data-font="bold" title="Bold">𝗕</button>
+                </div>
                 <button type="submit" class="send">Post</button>
               </div>
 
@@ -198,7 +205,7 @@
   <div id="settingsModal" class="settings-modal">
     <div class="settings-container">
       <div class="settings-sidebar">
-        <div class="settings-title">Настройки</div>
+        <div class="settings-title">Settings</div>
         <nav class="settings-nav">
           <button class="settings-nav-item active" data-tab="account">
             <span class="ico">👤</span> Account
@@ -228,22 +235,50 @@
         <div id="tab-account" class="settings-tab-content">
           <div class="settings-group">
             <div class="settings-field-header">
-              <div class="settings-label">Эмоджи-клан</div>
-              <div class="settings-hint">Выбран при регистрации. Изменить нельзя</div>
+              <div class="settings-label">Emoji Clan</div>
+              <div class="settings-hint">Chosen at registration. Cannot be changed.</div>
             </div>
             <div class="settings-emoji-display" id="settingsUserEmoji">👻</div>
           </div>
 
+          <!-- Core Flow Avatar Upload -->
+          <div class="settings-group" id="avatarUploadGroup">
+            <div class="settings-field-header">
+              <div>
+                <div class="settings-label">Profile Picture <span class="coreflow-badge-inline">⬡ Core Flow</span></div>
+                <div class="settings-hint">Upload a custom profile picture</div>
+              </div>
+            </div>
+            <div class="avatar-upload-area" id="avatarUploadArea">
+              <div class="avatar-preview" id="avatarPreview">👤</div>
+              <div class="avatar-upload-actions">
+                <label for="avatarFileInput" class="btn-pill btn-edit" style="cursor:pointer; display:inline-block;">Choose Photo</label>
+                <input type="file" id="avatarFileInput" accept="image/*" hidden />
+                <button type="button" id="removeAvatarBtn" class="btn-pill btn-secondary hidden">Remove</button>
+              </div>
+              <p class="settings-hint" style="margin-top:8px;">JPG, PNG or GIF · Max 3MB</p>
+            </div>
+            <div id="avatarLockedMsg" class="coreflow-locked-msg hidden">
+              <span>🔒</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-label">Display Name</div>
+            <div class="settings-hint">Your public name (anything you want)</div>
+            <input type="text" id="settingsDisplayName" class="settings-input" placeholder="Display Name" />
+          </div>
+
           <div class="settings-group">
             <div class="settings-label">Username</div>
-            <div class="settings-hint">Ваш уникальный идентификатор</div>
+            <div class="settings-hint">Your unique identifier</div>
             <input type="text" id="settingsUsername" class="settings-input" placeholder="username" />
           </div>
 
           <div class="settings-group">
-            <div class="settings-label">О себе</div>
-            <div class="settings-hint">Расскажите немного о себе</div>
-            <textarea id="settingsBio" class="settings-input" rows="4" placeholder="Напиши что-нибудь о себе..."></textarea>
+            <div class="settings-label">Bio</div>
+            <div class="settings-hint">Tell us a little about yourself</div>
+            <textarea id="settingsBio" class="settings-input" rows="4" placeholder="Write something about yourself..."></textarea>
           </div>
 
           <div class="settings-footer">
@@ -253,7 +288,29 @@
 
         <!-- Placeholder for other tabs -->
         <div id="tab-design" class="settings-tab-content hidden">
-          <div class="settings-placeholder">Design settings coming soon...</div>
+          <div class="settings-group" id="bannerUploadGroup">
+            <div class="settings-field-header">
+              <div>
+                <div class="settings-label">Profile Banner <span class="coreflow-badge-inline">⬡ Core Flow</span></div>
+                <div class="settings-hint">Upload a custom profile banner</div>
+              </div>
+            </div>
+            <div class="banner-upload-area" id="bannerUploadArea">
+              <div class="banner-preview-box" id="bannerPreview">
+                <div class="banner-placeholder">Banner Preview</div>
+              </div>
+              <div class="avatar-upload-actions" style="margin-top: 16px;">
+                <label for="bannerFileInput" class="btn-pill btn-edit" style="cursor:pointer; display:inline-block;">Choose Banner</label>
+                <input type="file" id="bannerFileInput" accept="image/*" hidden />
+                <button type="button" id="removeBannerBtn" class="btn-pill btn-secondary hidden">Remove</button>
+              </div>
+              <p class="settings-hint" style="margin-top:8px;">Recommended size: 1500x500 · JPG, PNG · Max 5MB</p>
+            </div>
+            <div id="bannerLockedMsg" class="coreflow-locked-msg hidden">
+              <span>🔒</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.
+            </div>
+          </div>
+          <div class="settings-placeholder" style="margin-top: 24px;">More design settings coming soon...</div>
         </div>
         <div id="tab-security" class="settings-tab-content hidden">
           <div class="settings-placeholder">Security settings coming soon...</div>
@@ -264,6 +321,45 @@
         <div id="tab-notifications" class="settings-tab-content hidden">
           <div class="settings-placeholder">Notification settings coming soon...</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Flow Upgrade Modal -->
+  <div id="coreFlowModal" class="settings-modal">
+    <div class="coreflow-premium-container">
+      <div class="coreflow-premium-header">
+        <div class="coreflow-premium-logo">⬡</div>
+        <h2>Core Flow</h2>
+        <p>The ultimate premium experience for CORE users.</p>
+        <button id="closeCoreFlow" class="settings-close">&times;</button>
+      </div>
+      <div class="coreflow-premium-features">
+        <div class="premium-feature-item">
+          <span class="feature-icon">💎</span>
+          <div>
+            <h4>Verified Identity</h4>
+            <p>Get the exclusive blue verification ring and badge.</p>
+          </div>
+        </div>
+        <div class="premium-feature-item">
+          <span class="feature-icon">🖼️</span>
+          <div>
+            <h4>Custom Avatars</h4>
+            <p>Upload your own profile picture (JPG, PNG, GIF).</p>
+          </div>
+        </div>
+        <div class="premium-feature-item">
+          <span class="feature-icon">🖋️</span>
+          <div>
+            <h4>Custom Typography</h4>
+            <p>Express yourself with Serif, Monospace, and Bold fonts.</p>
+          </div>
+        </div>
+      </div>
+      <div class="coreflow-premium-footer">
+        <div class="premium-price">Free for early adopters</div>
+        <button id="activateCoreFlowModal" class="coreflow-upgrade-btn" style="width: 100%; padding: 16px;">Activate Core Flow</button>
       </div>
     </div>
   </div>

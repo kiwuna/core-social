@@ -40,8 +40,12 @@ router.get("/", (req, res, next) => {
   const query = `
     SELECT 
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
+      COALESCE(p.font_style, 'default') as font_style,
       COALESCE(u.emoji, '👻') as emoji,
       COALESCE(u.username, 'anonymous') as username,
+      u.display_name,
+      COALESCE(u.is_premium, 0) as is_premium,
+      u.avatar_path,
       EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked,
       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
       pl.id as poll_id, pl.question as poll_question
@@ -96,8 +100,12 @@ router.get("/user/:userId", (req, res, next) => {
   const query = `
     SELECT 
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
+      COALESCE(p.font_style, 'default') as font_style,
       COALESCE(u.emoji, '👻') as emoji,
       COALESCE(u.username, 'anonymous') as username,
+      u.display_name,
+      COALESCE(u.is_premium, 0) as is_premium,
+      u.avatar_path,
       EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked,
       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
       pl.id as poll_id, pl.question as poll_question
@@ -151,6 +159,10 @@ router.post("/", isAuthenticated, upload.single("image"), (req, res, next) => {
   const content = rawContent.trim();
   const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
   const userId = req.session.userId;
+
+  // Font style (premium feature, validated server-side)
+  const ALLOWED_FONTS = ['default', 'serif', 'mono', 'bold'];
+  const fontStyle = ALLOWED_FONTS.includes(req.body.font_style) ? req.body.font_style : 'default';
   
   // Poll data
   let pollData = null;
@@ -175,8 +187,8 @@ router.post("/", isAuthenticated, upload.single("image"), (req, res, next) => {
   db.serialize(() => {
     db.run("BEGIN TRANSACTION");
 
-    const query = `INSERT INTO posts (content, image_path, user_id) VALUES (?, ?, ?)`;
-    db.run(query, [content, imagePath, userId], function onInsert(error) {
+    const query = `INSERT INTO posts (content, image_path, user_id, font_style) VALUES (?, ?, ?, ?)`;
+    db.run(query, [content, imagePath, userId, fontStyle], function onInsert(error) {
       if (error) {
         db.run("ROLLBACK");
         return next(error);
@@ -228,6 +240,7 @@ router.post("/", isAuthenticated, upload.single("image"), (req, res, next) => {
           likes: 0,
           image_path: imagePath,
           user_id: userId,
+          font_style: fontStyle,
           emoji: req.session.userEmoji,
           created_at: new Date().toISOString()
         });
@@ -366,7 +379,7 @@ router.get("/:id/comments", (req, res, next) => {
   const query = `
     SELECT 
       c.id, c.content, c.created_at, c.user_id,
-      u.username, u.emoji
+      u.username, u.display_name, u.emoji
     FROM comments c
     JOIN users u ON c.user_id = u.id
     WHERE c.post_id = ?
@@ -410,8 +423,11 @@ router.get("/search", (req, res, next) => {
   const query = `
     SELECT 
       p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
+      COALESCE(p.font_style, 'default') as font_style,
       COALESCE(u.emoji, '👻') as emoji,
       COALESCE(u.username, 'anonymous') as username,
+      COALESCE(u.is_premium, 0) as is_premium,
+      u.avatar_path,
       EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = p.id) as has_liked,
       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
       pl.id as poll_id, pl.question as poll_question

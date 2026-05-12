@@ -132,19 +132,68 @@ db.serialize(() => {
     }
   });
 
-  // Migration for users table (bio column)
+  // Migration for users table (bio, is_premium, avatar_path columns)
   db.serialize(() => {
     db.all(`PRAGMA table_info(users)`, [], (error, columns) => {
       if (error) {
         console.error("Could not inspect users table:", error.message);
         return;
       }
-      const hasBioColumn = columns.some((column) => column.name === "bio");
+      const hasBioColumn = columns.some((c) => c.name === "bio");
+      const hasPremiumColumn = columns.some((c) => c.name === "is_premium");
+      const hasAvatarColumn = columns.some((c) => c.name === "avatar_path");
+      const hasDisplayName = columns.some((c) => c.name === "display_name");
+ 
+      const hasBannerColumn = columns.some((c) => c.name === "banner_path");
+ 
       if (!hasBioColumn) {
         console.log("Adding bio column to users table...");
         db.run(`ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''`, (err) => {
           if (err) console.error("Error adding bio column:", err.message);
-          else console.log("Bio column added successfully.");
+          else console.log("Bio column added.");
+        });
+      }
+      if (!hasPremiumColumn) {
+        console.log("Adding is_premium column to users table...");
+        db.run(`ALTER TABLE users ADD COLUMN is_premium INTEGER NOT NULL DEFAULT 0`, (err) => {
+          if (err) console.error("Error adding is_premium column:", err.message);
+          else console.log("is_premium column added.");
+        });
+      }
+      if (!hasAvatarColumn) {
+        console.log("Adding avatar_path column to users table...");
+        db.run(`ALTER TABLE users ADD COLUMN avatar_path TEXT`, (err) => {
+          if (err) console.error("Error adding avatar_path column:", err.message);
+          else console.log("avatar_path column added.");
+        });
+      }
+      if (!hasDisplayName) {
+        console.log("Adding display_name column to users table...");
+        db.run(`ALTER TABLE users ADD COLUMN display_name TEXT`, (err) => {
+          if (err) console.error("Error adding display_name column:", err.message);
+          else console.log("display_name column added.");
+        });
+      }
+      if (!hasBannerColumn) {
+        console.log("Adding banner_path column to users table...");
+        db.run(`ALTER TABLE users ADD COLUMN banner_path TEXT`, (err) => {
+          if (err) console.error("Error adding banner_path column:", err.message);
+          else console.log("Banner column added.");
+        });
+      }
+    });
+  });
+
+  // Migration for posts table (font_style column)
+  db.serialize(() => {
+    db.all(`PRAGMA table_info(posts)`, [], (error, columns) => {
+      if (error) return;
+      const hasFontStyle = columns.some((c) => c.name === "font_style");
+      if (!hasFontStyle) {
+        console.log("Adding font_style column to posts table...");
+        db.run(`ALTER TABLE posts ADD COLUMN font_style TEXT DEFAULT 'default'`, (err) => {
+          if (err) console.error("Error adding font_style column:", err.message);
+          else console.log("font_style column added.");
         });
       }
     });

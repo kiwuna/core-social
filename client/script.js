@@ -59,6 +59,9 @@ const navFeed = document.getElementById("navFeed");
 const navSearch = document.getElementById("navSearch");
 const navProfile = document.getElementById("navProfile");
 const navCoreFlow = document.getElementById("navCoreFlow");
+const tabExplore = document.getElementById("tabExplore");
+const tabFollowing = document.getElementById("tabFollowing");
+let feedMode = "explore"; // 'explore' or 'following'
 
 // Search Elements
 const searchInput = document.getElementById("searchInput");
@@ -407,12 +410,29 @@ function createPostElement(post) {
 
 async function loadFeed() {
   try {
-    const response = await fetch(`${API_URL}/posts`);
+    const endpoint = feedMode === "following" ? "/feed/following" : "/posts";
+    const response = await fetch(`${API_URL}${endpoint}`);
+    
+    if (response.status === 401 && feedMode === "following") {
+      showFeedback("Log in to see your personalized feed.", "info");
+      switchFeedMode("explore");
+      return;
+    }
+    
     if (!response.ok) throw new Error("Load failed");
     const posts = await response.json();
     
     const postsList = document.getElementById("feedPosts");
     postsList.innerHTML = "";
+
+    if (posts.length === 0) {
+      const emptyMsg = feedMode === "following" 
+        ? "Follow users to personalize your feed." 
+        : "No posts yet. Be the first!";
+      postsList.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--muted);">${emptyMsg}</div>`;
+      return;
+    }
+
     posts.forEach((post, index) => {
       const el = createPostElement(post);
       el.style.opacity = "0";
@@ -427,6 +447,13 @@ async function loadFeed() {
   } catch (error) {
     showFeedback("Could not load posts.", "error");
   }
+}
+
+function switchFeedMode(mode) {
+  feedMode = mode;
+  tabExplore.classList.toggle("active", mode === "explore");
+  tabFollowing.classList.toggle("active", mode === "following");
+  loadFeed();
 }
 
 function hideAllViews() {
@@ -1343,6 +1370,10 @@ navProfile.addEventListener("click", (e) => {
   if (currentUser) showProfile(currentUser.id); 
   else window.location.href = "login.html";
 });
+
+// Feed Mode Listeners
+if (tabExplore) tabExplore.addEventListener("click", () => switchFeedMode("explore"));
+if (tabFollowing) tabFollowing.addEventListener("click", () => switchFeedMode("following"));
 
 // Core Flow Sidebar Link
 if (navCoreFlow) {

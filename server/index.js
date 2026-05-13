@@ -7,6 +7,7 @@ const db = require("./db/database");
 const postsRouter = require("./routes/posts");
 const authRouter = require("./routes/auth");
 const usersRouter = require("./routes/users");
+const feedRouter = require("./routes/feed");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -43,6 +44,7 @@ app.get("/", (req, res) => {
 app.use("/auth", authRouter);
 app.use("/posts", postsRouter);
 app.use("/users", usersRouter);
+app.use("/feed", feedRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

@@ -546,6 +546,16 @@ body {
 .btn-edit:hover { background: #eee; }
 .btn-follow { background: #fff; color: #000; }
 .btn-follow:hover { background: #eee; }
+.btn-follow.following {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+.btn-follow.following:hover {
+  background: rgba(255, 68, 68, 0.1);
+  border-color: #ff4444;
+  color: #ff4444;
+}
 .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
 .btn-secondary:hover { background: rgba(255,255,255,0.15); }
 

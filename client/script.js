@@ -450,12 +450,14 @@ async function showProfile(userId) {
 
   try {
     const userRes = await fetch(`/auth/users/${userId}`);
-    console.log("Profile fetch status:", userRes.status);
     if (!userRes.ok) throw new Error("User not found");
     const userData = (await userRes.json()).user;
 
     const postsRes = await fetch(`/posts/user/${userId}`);
     const userPosts = await postsRes.json();
+
+    const followRes = await fetch(`/users/${userId}/follow-status`);
+    const followData = await followRes.json();
 
     const isMe = currentUser && String(currentUser.id) === String(userId);
     const regDate = new Date(userData.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -488,7 +490,7 @@ async function showProfile(userId) {
           <div class="profile-actions">
             ${isMe 
               ? '<button class="btn-pill btn-edit">Edit Profile</button><button class="btn-pill btn-secondary">Settings</button>' 
-              : '<button class="btn-pill btn-follow">Follow</button><button class="btn-pill btn-secondary">Message</button>'}
+              : `<button class="btn-pill btn-follow ${followData.isFollowing ? 'following' : ''}" data-user-id="${userId}">${followData.isFollowing ? 'Following' : 'Follow'}</button><button class="btn-pill btn-secondary">Message</button>`}
           </div>
         </div>
       </div>
@@ -503,8 +505,8 @@ async function showProfile(userId) {
         ${userData.bio ? `<p class="bio" style="margin-top: 12px; color: var(--text); font-size: 15px; line-height: 1.5;">${userData.bio}</p>` : ""}
 
         <div class="profile-stats">
-          <span><b>0</b> followers</span>
-          <span><b>0</b> following</span>
+          <span id="followerCountDisplay"><b>${formatNumber(followData.followerCount)}</b> followers</span>
+          <span id="followingCountDisplay"><b>${formatNumber(followData.followingCount)}</b> following</span>
         </div>
         
         <div class="profile-meta">
@@ -878,8 +880,15 @@ document.addEventListener("click", async (event) => {
   const likeBtn = event.target.closest(".action-like");
   const commentBtn = event.target.closest(".action-comment");
   const deleteButton = event.target.closest(".action-delete");
+  const followBtn = event.target.closest(".btn-follow");
   const postElement = event.target.closest(".post");
   
+  if (followBtn) {
+    const targetId = followBtn.dataset.userId;
+    handleFollow(targetId, followBtn);
+    return;
+  }
+
   if (!postElement) return;
   const postId = postElement.dataset.postId;
  
@@ -1409,6 +1418,48 @@ if (activateCoreFlowModal) {
       activateCoreFlowModal.textContent = 'Activate Core Flow';
     }
   });
+}
+
+async function handleFollow(userId, button) {
+  if (!currentUser) { window.location.href = "login.html"; return; }
+  if (button.disabled) return;
+
+  const isFollowing = button.classList.contains("following");
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = "...";
+
+  try {
+    const res = await fetch(`/users/${userId}/follow`, {
+      method: isFollowing ? "DELETE" : "POST"
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const nowFollowing = !isFollowing;
+      button.classList.toggle("following", nowFollowing);
+      button.textContent = nowFollowing ? "Following" : "Follow";
+      showFeedback(data.message, "success");
+
+      // Update counts instantly
+      const followerCountEl = document.getElementById("followerCountDisplay");
+      if (followerCountEl) {
+        const b = followerCountEl.querySelector("b");
+        let count = parseInt(b.textContent.replace(/[^0-9]/g, "")) || 0;
+        count = nowFollowing ? count + 1 : Math.max(0, count - 1);
+        b.textContent = formatNumber(count);
+      }
+    } else {
+      const err = await res.json();
+      showFeedback(err.error || "Action failed", "error");
+      button.textContent = originalText;
+    }
+  } catch (err) {
+    showFeedback("Error connecting to server", "error");
+    button.textContent = originalText;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 (async function init() {

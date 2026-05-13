@@ -2,7 +2,7 @@ const express = require("express");
 const path = require("path");
 require("dotenv").config();
 const session = require("express-session");
-const SQLiteStore = require("connect-sqlite3")(session);
+const PgStore = require("connect-pg-simple")(session);
 const db = require("./db/database");
 const postsRouter = require("./routes/posts");
 const authRouter = require("./routes/auth");
@@ -17,9 +17,9 @@ app.locals.db = db;
 // Session configuration
 app.use(
   session({
-    store: new SQLiteStore({
-      db: "sessions.db",
-      dir: path.join(__dirname, "..", "database"),
+    store: new PgStore({
+      pool: db,
+      tableName: "session",
     }),
     secret: process.env.SESSION_SECRET || "core-social-secret-key",
     resave: false,

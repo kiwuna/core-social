@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Core — Liquid</title>
+<title>Core</title>
+<link rel="icon" type="image/png" href="./favicon.png" />
 <link rel="stylesheet" href="./style.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://js.stripe.com/dahlia/stripe.js"></script>
@@ -47,10 +48,14 @@
         <!-- FIXED HEADER (Outside Scroll Container) -->
         <div id="stickyHeader" class="sticky-header">
           <div class="feed-tabs-container">
+            <button id="mobileMenuBtn" class="mobile-menu-btn">
+              <span id="userEmojiMobile" class="mini-avatar">👻</span>
+            </button>
             <div class="tabs">
               <button id="tabExplore" class="tab active">Explore</button>
               <button id="tabFollowing" class="tab">Following</button>
             </div>
+            <div style="width: 40px; display: none;" id="headerSpacer"></div>
           </div>
 
           <!-- Composer -->
@@ -373,6 +378,26 @@
       </div>
     </div>
   </div>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="mobile-nav">
+    <a href="#" class="mobile-nav-item active" id="mobNavFeed">
+      <span class="ico">📰</span>
+      <span>Feed</span>
+    </a>
+    <a href="#" class="mobile-nav-item" id="mobNavSearch">
+      <span class="ico">🔍</span>
+      <span>Search</span>
+    </a>
+    <a href="#" class="mobile-nav-item" id="mobNavNotifications">
+      <span class="ico">🔔</span>
+      <span>Alerts</span>
+    </a>
+    <a href="#" class="mobile-nav-item" id="mobNavProfile">
+      <span class="ico">👤</span>
+      <span>Profile</span>
+    </a>
+  </nav>
 
   <script src="./script.js"></script>
 </body>

@@ -112,6 +112,19 @@ const coreFlowModal = document.getElementById("coreFlowModal");
 const closeCoreFlow = document.getElementById("closeCoreFlow");
 const activateCoreFlowModal = document.getElementById("activateCoreFlowModal");
 
+// Mobile Elements
+const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+const mobNavFeed = document.getElementById("mobNavFeed");
+const mobNavSearch = document.getElementById("mobNavSearch");
+const mobNavNotifications = document.getElementById("mobNavNotifications");
+const mobNavProfile = document.getElementById("mobNavProfile");
+const userEmojiMobile = document.getElementById("userEmojiMobile");
+
+// Create Sidebar Overlay
+const sidebarOverlay = document.createElement("div");
+sidebarOverlay.className = "sidebar-overlay";
+document.body.appendChild(sidebarOverlay);
+
 function showFeedback(message, type = "info") {
   if (!feedbackMessage) return;
   feedbackMessage.textContent = message;
@@ -168,8 +181,16 @@ function updateAuthUI() {
       } else {
         userEmojiMini.textContent = currentUser.emoji;
       }
-      // Round avatar for premium users
       userEmojiMini.classList.toggle('round-avatar', !!currentUser.is_premium);
+    }
+    
+    if (userEmojiMobile) {
+      if (currentUser.is_premium && currentUser.avatar_path) {
+        userEmojiMobile.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      } else {
+        userEmojiMobile.textContent = currentUser.emoji;
+      }
+      userEmojiMobile.classList.toggle('round-avatar', !!currentUser.is_premium);
     }
     // Show font picker for premium users
     if (fontStylePicker) fontStylePicker.classList.toggle('hidden', !currentUser.is_premium);
@@ -218,6 +239,10 @@ function updateAuthUI() {
     if (userEmojiMini) {
       userEmojiMini.textContent = "👻";
       userEmojiMini.classList.remove('premium-ring', 'round-avatar');
+    }
+    if (userEmojiMobile) {
+      userEmojiMobile.textContent = "👻";
+      userEmojiMobile.classList.remove('round-avatar');
     }
     if (fontStylePicker) fontStylePicker.classList.add('hidden');
     if (avatarUploadArea) avatarUploadArea.classList.add('hidden');
@@ -472,6 +497,7 @@ async function showProfile(userId) {
   hideAllViews();
   profileView.classList.remove("hidden");
   navProfile.classList.add("active");
+  setMobileNavActive("mobNavProfile");
 
   profileContent.innerHTML = `<div style="padding: 40px; color: var(--muted);">Loading profile...</div>`;
 
@@ -584,6 +610,7 @@ function showFeed() {
   hideAllViews();
   feedView.classList.remove("hidden");
   navFeed.classList.add("active");
+  setMobileNavActive("mobNavFeed");
   loadFeed();
 }
 
@@ -591,8 +618,80 @@ function showSearchView() {
   hideAllViews();
   searchView.classList.remove("hidden");
   navSearch.classList.add("active");
+  setMobileNavActive("mobNavSearch");
   setTimeout(() => searchInput && searchInput.focus(), 100);
 }
+
+// ═══════════════════════════════════════
+// Mobile Navigation & Sidebar Logic
+// ═══════════════════════════════════════
+
+function toggleSidebar(show) {
+  const sidebar = document.querySelector(".sidebar");
+  if (show === undefined) show = !sidebar.classList.contains("open");
+  
+  sidebar.classList.toggle("open", show);
+  sidebarOverlay.classList.toggle("show", show);
+  document.body.style.overflow = show ? "hidden" : "";
+}
+
+if (mobileMenuBtn) {
+  mobileMenuBtn.addEventListener("click", () => toggleSidebar(true));
+}
+
+sidebarOverlay.addEventListener("click", () => toggleSidebar(false));
+
+// Mobile Nav Clicks
+function setMobileNavActive(id) {
+  const items = document.querySelectorAll(".mobile-nav-item");
+  items.forEach(item => item.classList.toggle("active", item.id === id));
+}
+
+if (mobNavFeed) {
+  mobNavFeed.addEventListener("click", (e) => {
+    e.preventDefault();
+    setMobileNavActive("mobNavFeed");
+    showFeed();
+  });
+}
+
+if (mobNavSearch) {
+  mobNavSearch.addEventListener("click", (e) => {
+    e.preventDefault();
+    setMobileNavActive("mobNavSearch");
+    showSearchView();
+  });
+}
+
+if (mobNavNotifications) {
+  mobNavNotifications.addEventListener("click", (e) => {
+    e.preventDefault();
+    setMobileNavActive("mobNavNotifications");
+    showFeedback("Notifications coming soon!");
+  });
+}
+
+if (mobNavProfile) {
+  mobNavProfile.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      window.location.href = "login.html";
+      return;
+    }
+    setMobileNavActive("mobNavProfile");
+    showProfile(currentUser.id);
+  });
+}
+
+// Sync Sidebar Nav with Mobile Nav
+const sidebarLinks = document.querySelectorAll(".nav-item, .footer-link");
+sidebarLinks.forEach(link => {
+  link.addEventListener("click", () => {
+    if (window.innerWidth <= 900) {
+      toggleSidebar(false);
+    }
+  });
+});
 
 // ═══════════════════════════════════════
 // Search Logic

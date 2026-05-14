@@ -38,7 +38,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "client")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_4eC39HqLyjWDarjtT1zdp7dc');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 app.post('/create-checkout-session', async (req, res) => {
   if (!req.session.userId) return res.redirect('/login.html');

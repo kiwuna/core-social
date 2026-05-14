@@ -6,6 +6,7 @@
 <title>Core — Liquid</title>
 <link rel="stylesheet" href="./style.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://js.stripe.com/dahlia/stripe.js"></script>
 </head>
 <body>
   <main class="dashboard">
@@ -355,10 +356,20 @@
             <p>Express yourself with Serif, Monospace, and Bold fonts.</p>
           </div>
         </div>
+        <div class="premium-feature-item">
+          <span class="feature-icon">📸</span>
+          <div>
+            <h4>Image Posts</h4>
+            <p>Attach and share images in your posts.</p>
+          </div>
+        </div>
       </div>
       <div class="coreflow-premium-footer">
-        <div class="premium-price">Free for early adopters</div>
-        <button id="activateCoreFlowModal" class="coreflow-upgrade-btn" style="width: 100%; padding: 16px;">Activate Core Flow</button>
+        <div class="premium-price">$4.99 / month</div>
+        <form action="/create-checkout-session" method="POST" style="width: 100%;">
+          <input type="hidden" name="lookup_key" value="Core_Flow-72dc0f4" />
+          <button id="checkout-and-portal-button" type="submit" class="coreflow-upgrade-btn" style="width: 100%; padding: 16px;">Checkout</button>
+        </form>
       </div>
     </div>
   </div>

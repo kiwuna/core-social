@@ -825,7 +825,15 @@ if (postForm) {
   });
 }
 
-if (pickImageButton) pickImageButton.addEventListener("click", () => imageInput.click());
+if (pickImageButton) {
+  pickImageButton.addEventListener("click", () => {
+    if (currentUser && currentUser.is_premium) {
+      imageInput.click();
+    } else {
+      if (coreFlowModal) coreFlowModal.classList.add('show');
+    }
+  });
+}
 if (imageInput) {
   imageInput.addEventListener("change", () => {
     const file = imageInput.files && imageInput.files[0];
@@ -1495,5 +1503,16 @@ async function handleFollow(userId, button) {
 
 (async function init() {
   await fetchCurrentUser();
+  
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.get("checkout") === "success") {
+    showFeedback("Successfully upgraded to Core Flow!", "success");
+    if (currentUser) {
+      showProfile(currentUser.id);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+  }
+
   await loadFeed();
 })();

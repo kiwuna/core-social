@@ -34,8 +34,59 @@ app.use(
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "client")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_4eC39HqLyjWDarjtT1zdp7dc');
+
+app.post('/create-checkout-session', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login.html');
+  
+  // Create a mock or use actual Stripe API to create session
+  // Usually this uses stripe.prices.list, but for example purposes with lookup_key
+  try {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).send("Stripe is not configured. Please add STRIPE_SECRET_KEY to your server/.env file.");
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product: 'prod_UW4qnAXZRwAB0J', // Using your specific Product ID
+            unit_amount: 499,
+            recurring: {
+              interval: 'month',
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `http://localhost:${PORT}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `http://localhost:${PORT}/`,
+    });
+
+    res.redirect(303, session.url);
+  } catch (err) {
+    console.error("Stripe error:", err);
+    res.status(500).send("Internal Server Error: " + err.message);
+  }
+});
+
+app.get('/checkout-success', async (req, res) => {
+  if (!req.session.userId) return res.redirect('/login.html');
+  try {
+    // We update the DB to make the user premium
+    await db.query("UPDATE users SET is_premium = 1 WHERE id = $1", [req.session.userId]);
+  } catch (err) {
+    console.error("Error updating user premium status:", err);
+  }
+  // Redirect back to user's profile
+  res.redirect(`/?checkout=success`);
+});
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "client", "index.html"));

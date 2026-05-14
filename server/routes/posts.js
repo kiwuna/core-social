@@ -145,6 +145,16 @@ router.post("/", isAuthenticated, upload.single("image"), async (req, res, next)
     }
   }
 
+  if (imagePath) {
+    const userRes = await db.query("SELECT is_premium FROM users WHERE id = $1", [userId]);
+    const user = userRes.rows[0];
+    if (!user || !user.is_premium) {
+      const imageDiskPath = path.join(uploadsDirectory, req.file.filename);
+      fs.unlink(imageDiskPath, () => {});
+      return res.status(403).json({ error: "Uploading images requires Core Flow." });
+    }
+  }
+
   if (!content && !imagePath && !pollData) {
     return res.status(400).json({ error: "Post must contain text, an image, or a poll." });
   }

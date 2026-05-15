@@ -31,15 +31,14 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
       });
     }
 
-    // Cooldown check: 60 seconds between requests (UTC safe)
+    // Cooldown check: 60 seconds between requests (BIGINT safe)
     const userResult = await db.query("SELECT last_sync_request FROM users WHERE id = $1", [userId]);
-    const lastRequest = userResult.rows[0].last_sync_request;
+    const lastRequest = userResult.rows[0].last_sync_request; // This will be a string or number from PG
     
     if (lastRequest) {
-      const now = new Date();
-      const last = new Date(lastRequest);
-      // Use getTime() for pure UTC millisecond comparison
-      const diff = (now.getTime() - last.getTime()) / 1000; 
+      const now = Date.now();
+      const last = Number(lastRequest);
+      const diff = (now - last) / 1000; 
       
       if (diff < 60 && diff >= 0) {
         return res.status(429).json({ 
@@ -51,10 +50,10 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
 
     const code = generateCode();
 
-    // Save code and timestamp to user (Strict UTC)
+    // Save code and timestamp to user (BIGINT raw milliseconds)
     await db.query(
-      "UPDATE users SET email = $1, sync_code = $2, last_sync_request = CURRENT_TIMESTAMP AT TIME ZONE 'UTC' WHERE id = $3",
-      [email.toLowerCase(), code, userId]
+      "UPDATE users SET email = $1, sync_code = $2, last_sync_request = $3 WHERE id = $4",
+      [email.toLowerCase(), code, Date.now(), userId]
     );
 
     // Send the CORE themed email

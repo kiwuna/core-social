@@ -34,7 +34,7 @@ const initDb = async () => {
         email TEXT UNIQUE,
         is_synced BOOLEAN DEFAULT FALSE,
         sync_code TEXT,
-        last_sync_request TIMESTAMP,
+        last_sync_request BIGINT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -44,7 +44,9 @@ const initDb = async () => {
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_synced BOOLEAN DEFAULT FALSE');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS sync_code TEXT');
-      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_sync_request TIMESTAMP');
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_sync_request BIGINT');
+      // Ensure it is BIGINT even if it was TIMESTAMP before
+      await pool.query('ALTER TABLE users ALTER COLUMN last_sync_request TYPE BIGINT USING (EXTRACT(EPOCH FROM last_sync_request) * 1000)::BIGINT');
     } catch (e) {
       console.log("Columns already exist or could not be added:", e.message);
     }

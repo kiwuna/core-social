@@ -2045,6 +2045,15 @@ if (btnRequestSync) {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        if (data.isSynced) {
+          currentUser.isSynced = true;
+          currentUser.email = email;
+          updateAuthUI();
+          openSettings('security', false);
+          showFeedback(data.message || "Email verified!", "success");
+          return;
+        }
         syncEmailAddress.textContent = email;
         syncEmailForm.classList.add("hidden");
         verifySyncForm.classList.remove("hidden");

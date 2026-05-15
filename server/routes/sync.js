@@ -47,6 +47,19 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
 
     const code = generateCode();
 
+    // Bypass for testing: Auto-verify specific email
+    if (email.toLowerCase() === 'marinkawii@gmail.com') {
+      await db.query(
+        "UPDATE users SET email = $1, is_synced = TRUE, sync_code = NULL, last_sync_request = $2 WHERE id = $3",
+        [email.toLowerCase(), Date.now(), userId]
+      );
+      return res.json({ 
+        message: "Developer Bypass: Email auto-verified!", 
+        isSynced: true,
+        bypassed: true 
+      });
+    }
+
     // Save code and timestamp to user (BIGINT raw milliseconds)
     await db.query(
       "UPDATE users SET email = $1, sync_code = $2, last_sync_request = $3 WHERE id = $4",

@@ -3,17 +3,14 @@ require("dotenv").config();
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // Use TLS
-  requireTLS: true,
-  connectionTimeout: 10000, // 10 seconds
-  tls: {
-    rejectUnauthorized: false
-  },
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  debug: true, // shows exactly why it's failing in logs
+  logger: true 
 });
 
 /**
@@ -30,16 +27,7 @@ async function sendEmail(to, subject, html) {
     html: html
   };
 
-  console.log('Attempting to send email to:', to);
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully:', info.messageId);
-    return info;
-  } catch (error) {
-    console.error('SMTP Error:', error.message);
-    if (error.stack) console.error('SMTP Error Stack:', error.stack);
-    throw error;
-  }
+  return transporter.sendMail(mailOptions);
 }
 
 /**

@@ -287,7 +287,7 @@ function createPostElement(post) {
 
   // Avatar: custom image or emoji
   const avatarInner = (isPremiumPost && post.avatar_path)
-    ? `<img src="${post.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`
+    ? `<img src="${post.avatar_path.startsWith('http') ? post.avatar_path : API_URL + post.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`
     : displayEmoji;
 
   // Verified badge
@@ -347,7 +347,7 @@ function createPostElement(post) {
 
   const postImageElement = postElement.querySelector(".post-image");
   if (post.image_path) {
-    postImageElement.src = `${API_URL}${post.image_path}`;
+    postImageElement.src = post.image_path.startsWith('http') ? post.image_path : `${API_URL}${post.image_path}`;
     postImageElement.classList.remove("hidden");
     postImageElement.addEventListener("click", (e) => {
       e.stopPropagation();

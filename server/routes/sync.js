@@ -31,6 +31,7 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
       });
     }
 
+    /*
     // Cooldown check: 60 seconds (60,000ms) raw Unix time
     const userResult = await db.query("SELECT last_sync_request FROM users WHERE id = $1", [userId]);
     const lastRequest = userResult.rows[0].last_sync_request; 
@@ -42,6 +43,7 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
         error: `Please wait ${remaining} seconds before requesting a new code.` 
       });
     }
+    */
 
     const code = generateCode();
 

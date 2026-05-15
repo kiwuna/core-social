@@ -31,21 +31,16 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
       });
     }
 
-    // Cooldown check: 60 seconds between requests (BIGINT safe)
+    // Cooldown check: 60 seconds (60,000ms) raw Unix time
     const userResult = await db.query("SELECT last_sync_request FROM users WHERE id = $1", [userId]);
-    const lastRequest = userResult.rows[0].last_sync_request; // This will be a string or number from PG
+    const lastRequest = userResult.rows[0].last_sync_request; 
     
-    if (lastRequest) {
-      const now = Date.now();
-      const last = Number(lastRequest);
-      const diff = (now - last) / 1000; 
-      
-      if (diff < 60 && diff >= 0) {
-        return res.status(429).json({ 
-          type: 'cooldown',
-          error: `Please wait ${Math.ceil(60 - diff)} seconds before requesting a new code.` 
-        });
-      }
+    if (lastRequest && (Date.now() - Number(lastRequest) < 60000)) {
+      const remaining = Math.ceil((60000 - (Date.now() - Number(lastRequest))) / 1000);
+      return res.status(429).json({ 
+        type: 'cooldown',
+        error: `Please wait ${remaining} seconds before requesting a new code.` 
+      });
     }
 
     const code = generateCode();

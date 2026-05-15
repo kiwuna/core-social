@@ -25,26 +25,35 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
     // Check if email is already synced to another account
     const emailCheck = await db.query("SELECT id FROM users WHERE email = $1 AND id != $2", [email.toLowerCase(), userId]);
     if (emailCheck.rows.length > 0) {
-      return res.status(400).json({ error: "This email is already connected to another account." });
+      return res.status(400).json({ 
+        type: 'gmail',
+        error: "This email is already connected to another account." 
+      });
     }
 
-    // Cooldown check: 60 seconds between requests
+    // Cooldown check: 60 seconds between requests (UTC safe)
     const userResult = await db.query("SELECT last_sync_request FROM users WHERE id = $1", [userId]);
     const lastRequest = userResult.rows[0].last_sync_request;
     
     if (lastRequest) {
       const now = new Date();
-      const diff = (now - new Date(lastRequest)) / 1000; // in seconds
-      if (diff < 60) {
-        return res.status(429).json({ error: `Please wait ${Math.ceil(60 - diff)} seconds before requesting a new code.` });
+      const last = new Date(lastRequest);
+      // Use getTime() for pure UTC millisecond comparison
+      const diff = (now.getTime() - last.getTime()) / 1000; 
+      
+      if (diff < 60 && diff >= 0) {
+        return res.status(429).json({ 
+          type: 'cooldown',
+          error: `Please wait ${Math.ceil(60 - diff)} seconds before requesting a new code.` 
+        });
       }
     }
 
     const code = generateCode();
 
-    // Save code and timestamp to user
+    // Save code and timestamp to user (Strict UTC)
     await db.query(
-      "UPDATE users SET email = $1, sync_code = $2, last_sync_request = NOW() WHERE id = $3",
+      "UPDATE users SET email = $1, sync_code = $2, last_sync_request = CURRENT_TIMESTAMP AT TIME ZONE 'UTC' WHERE id = $3",
       [email.toLowerCase(), code, userId]
     );
 
@@ -54,7 +63,10 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
     res.json({ message: "Verification code sent to " + email });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(400).json({ error: "This email is already connected to another account." });
+      return res.status(400).json({ 
+        type: 'gmail',
+        error: "This email is already connected to another account." 
+      });
     }
     console.error("Sync request error:", err);
     res.status(500).json({ error: "Failed to send verification code. Please check your email configuration." });

@@ -64,7 +64,7 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
         error: "This email is already connected to another account." 
       });
     }
-    console.error("Sync request error:", err);
+    console.error("Sync request error stack:", err.stack);
     res.status(500).json({ error: "Failed to send verification code. Please check your email configuration." });
   }
 });

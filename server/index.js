@@ -50,6 +50,7 @@ app.post('/create-checkout-session', async (req, res) => {
       return res.status(500).send("Stripe is not configured. Please add STRIPE_SECRET_KEY to your server/.env file.");
     }
 
+    const domain = `${req.protocol}://${req.get('host')}`;
     const session = await stripe.checkout.sessions.create({
       line_items: [
         {
@@ -65,8 +66,8 @@ app.post('/create-checkout-session', async (req, res) => {
         },
       ],
       mode: 'subscription',
-      success_url: `http://localhost:${PORT}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `http://localhost:${PORT}/`,
+      success_url: `${domain}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${domain}/`,
     });
 
     res.redirect(303, session.url);

@@ -84,7 +84,7 @@
             inputs.forEach(i => i.classList.remove('error-state'));
 
             if (window.location.protocol === 'file:') {
-                showFeedback('Error: Open through http://localhost:3000!', 'error');
+                showFeedback('Error: Please open through a web server (http/https)!', 'error');
                 return;
             }
 

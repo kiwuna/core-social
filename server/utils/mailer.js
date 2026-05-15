@@ -30,7 +30,16 @@ async function sendEmail(to, subject, html) {
     html: html
   };
 
-  return transporter.sendMail(mailOptions);
+  console.log('Attempting to send email to:', to);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully:', info.messageId);
+    return info;
+  } catch (error) {
+    console.error('SMTP Error:', error.message);
+    if (error.stack) console.error('SMTP Error Stack:', error.stack);
+    throw error;
+  }
 }
 
 /**

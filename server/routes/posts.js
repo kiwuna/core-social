@@ -23,7 +23,7 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "core_posts",
-    format: async (req, file) => "webp",
+    format: async (req, file) => "jpg", // Force JPG to strip animation
     transformation: [{ width: 800, height: 800, crop: "fill" }]
   }
 });
@@ -82,6 +82,7 @@ router.get("/", async (req, res, next) => {
         COALESCE(u.username, 'anonymous') as username,
         u.display_name,
         COALESCE(u.is_premium, 0) as is_premium,
+        COALESCE(u.is_synced, false) as is_synced,
         u.avatar_path,
         EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
@@ -114,6 +115,7 @@ router.get("/user/:userId", async (req, res, next) => {
         COALESCE(u.username, 'anonymous') as username,
         u.display_name,
         COALESCE(u.is_premium, 0) as is_premium,
+        COALESCE(u.is_synced, false) as is_synced,
         u.avatar_path,
         EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
@@ -153,11 +155,13 @@ router.post("/", isAuthenticated, upload.single("image"), async (req, res, next)
   }
 
   if (imagePath) {
-    const userRes = await db.query("SELECT is_premium FROM users WHERE id = $1", [userId]);
+    const userRes = await db.query("SELECT is_premium, is_synced FROM users WHERE id = $1", [userId]);
     const user = userRes.rows[0];
     if (!user || !user.is_premium) {
-      // Typically you would delete from Cloudinary here if they aren't allowed
       return res.status(403).json({ error: "Uploading images requires Core Flow." });
+    }
+    if (!user.is_synced) {
+      return res.status(403).json({ error: "Please sync your email in settings to upload images." });
     }
   }
 
@@ -286,7 +290,16 @@ router.post("/:id/like", isAuthenticated, async (req, res, next) => {
     try {
       await client.query("BEGIN");
       await client.query(`INSERT INTO likes (user_id, post_id) VALUES ($1, $2)`, [userId, postId]);
-      const updateResult = await client.query(`UPDATE posts SET likes = likes + 1 WHERE id = $1 RETURNING likes`, [postId]);
+      const updateResult = await client.query(`UPDATE posts SET likes = likes + 1 WHERE id = $1 RETURNING likes, user_id`, [postId]);
+      
+      const postOwnerId = updateResult.rows[0].user_id;
+      if (postOwnerId !== userId) {
+        await client.query(
+          "INSERT INTO notifications (recipient_id, sender_id, type, post_id) VALUES ($1, $2, $3, $4)",
+          [postOwnerId, userId, 'like', postId]
+        );
+      }
+
       await client.query("COMMIT");
       res.json({ id: postId, likes: updateResult.rows[0].likes });
     } catch (err) {
@@ -335,7 +348,7 @@ router.get("/:id/comments", async (req, res, next) => {
     const query = `
       SELECT 
         c.id, c.content, c.created_at, c.user_id,
-        u.username, u.display_name, u.emoji
+        u.username, u.display_name, u.emoji, u.avatar_path, u.is_premium, u.is_synced
       FROM comments c
       JOIN users u ON c.user_id = u.id
       WHERE c.post_id = $1
@@ -361,7 +374,17 @@ router.post("/:id/comments", isAuthenticated, async (req, res, next) => {
     const insertQuery = `INSERT INTO comments (post_id, user_id, content) VALUES ($1, $2, $3) RETURNING id`;
     const insertResult = await db.query(insertQuery, [postId, userId, content]);
     
-    const getQuery = `SELECT c.*, u.username, u.emoji FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = $1`;
+    // Notification for comment
+    const postOwnerRes = await db.query("SELECT user_id FROM posts WHERE id = $1", [postId]);
+    const postOwnerId = postOwnerRes.rows[0]?.user_id;
+    if (postOwnerId && postOwnerId !== userId) {
+      await db.query(
+        "INSERT INTO notifications (recipient_id, sender_id, type, post_id) VALUES ($1, $2, $3, $4)",
+        [postOwnerId, userId, 'comment', postId]
+      );
+    }
+
+    const getQuery = `SELECT c.*, u.username, u.emoji, u.avatar_path, u.is_premium, u.is_synced FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = $1`;
     const getResult = await db.query(getQuery, [insertResult.rows[0].id]);
     res.status(201).json(getResult.rows[0]);
   } catch (err) {
@@ -385,6 +408,7 @@ router.get("/search", async (req, res, next) => {
         COALESCE(u.emoji, '👻') as emoji,
         COALESCE(u.username, 'anonymous') as username,
         COALESCE(u.is_premium, 0) as is_premium,
+        COALESCE(u.is_synced, false) as is_synced,
         u.avatar_path,
         EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,

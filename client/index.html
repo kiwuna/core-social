@@ -10,6 +10,7 @@
 <script src="https://js.stripe.com/dahlia/stripe.js"></script>
 </head>
 <body>
+  <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
   <main class="dashboard">
     <!-- Sidebar -->
     <aside class="sidebar">
@@ -19,10 +20,14 @@
       </div>
 
       <nav class="nav">
-        <a id="navFeed" class="nav-item active" href="#"><span class="ico">📰</span> <span>Feed</span></a>
-        <a id="navSearch" class="nav-item" href="#"><span class="ico">🔍</span> <span>Search</span></a>
-        <a id="navEvents" class="nav-item" href="#"><span class="ico">🎭</span> <span>Events</span></a>
-        <a id="navNotifications" class="nav-item" href="#"><span class="ico">🔔</span> <span>Notifications</span></a>
+        <a id="navFeed" class="nav-item active" href="#"><span class="ico"><img src="./assets/home.png" width="22" height="22"></span> <span>Feed</span></a>
+        <a id="navSearch" class="nav-item" href="#"><span class="ico"><img src="./assets/search.png" width="22" height="22"></span> <span>Search</span></a>
+        <a id="navEvents" class="nav-item" href="#"><span class="ico"><img src="./assets/community.png" width="22" height="22"></span> <span>Events</span></a>
+        <a id="navNotifications" class="nav-item" href="#" style="position: relative;">
+          <span class="ico"><img src="./assets/bell.png" width="22" height="22"></span> 
+          <span>Notifications</span>
+          <div id="unreadBadge" style="position: absolute; top: 12px; left: 28px; width: 8px; height: 8px; background: #ff4444; border-radius: 50%; display: none; border: 2px solid var(--panel);"></div>
+        </a>
         <a id="navProfile" class="nav-item" href="#">
           <span class="ico" id="userEmojiLarge">👤</span> 
           <div style="display: flex; flex-direction: column; line-height: 1.2;">
@@ -32,10 +37,10 @@
         </a>
       </nav>
 
-      <div class="sidebar-footer">
+      <div class="sidebar-footer"> 
         <a href="#" id="navCoreFlow" class="footer-link"><span class="ico">⭐</span> <span>CORE FLOW</span></a>
-        <a href="#" id="logoutBtn" class="footer-link hidden"><span class="ico">🚪</span> <span>Logout</span></a>
-        <a href="login.html" id="loginLink" class="footer-link"><span class="ico">🔑</span> <span>Login</span></a>
+        <a href="#" id="logoutBtn" class="footer-link hidden"><span class="ico"><img src="./assets/logout.png" width="22" height="22"></span> <span>Logout</span></a>
+        <a href="login.html" id="loginLink" class="footer-link"><span class="ico"></span> <span>Login</span></a>
       </div>
     </aside>
 
@@ -75,12 +80,10 @@
               
               <div class="composer-bottom">
                 <div class="composer-tools">
-                  <span id="pickImageButton" title="Add Image">📎</span>
-                  <span>😊</span>
-                  <span>🎨</span>
-                  <span id="togglePollButton" title="Add Poll">📊</span>
+                  <span id="pickImageButton" title="Add Image"><img src="./assets/folder.png" width="20" height="20"></span>
+                  <input id="imageInput" type="file" accept="image/jpeg,image/png" hidden />
+                  <span id="togglePollButton" title="Add Poll"><img src="./assets/stats.png" width="20" height="20"></span>
                 </div>
-                <input id="imageInput" type="file" accept="image/*" hidden />
                 <!-- Font Style Picker (Core Flow only) -->
                 <div id="fontStylePicker" class="font-style-picker hidden">
                   <button type="button" class="font-btn active" data-font="default" title="Default">Aa</button>
@@ -107,6 +110,7 @@
 
               <div id="imagePreviewBox" class="image-preview-box hidden" style="margin-top: 15px;">
                 <img id="imagePreview" alt="Preview" style="max-width: 100px; border-radius: 12px;" />
+                <p class="settings-hint" style="font-size: 10px;">Max 5MB (JPG, PNG)</p>
                 <button id="removeImageButton" type="button" style="background: none; border: 0; color: #888; cursor: pointer;">Remove</button>
               </div>
             </form>
@@ -116,7 +120,6 @@
         <div id="feedScrollArea" class="feed-content">
           <!-- Feed Posts Wrapper -->
           <div class="feed-posts-wrapper" style="padding-top: 0;">
-            <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
             <div id="feedPosts" style="display: flex; flex-direction: column; gap: 12px;"></div>
           </div>
         </div>
@@ -165,7 +168,9 @@
 
           <div id="searchResults" class="search-results">
             <div class="search-empty-state">
-              <div class="search-empty-icon">🔍</div>
+              <div class="search-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:48px;height:48px;opacity:0.5;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
               <p>Start typing to search</p>
               <span>Find users, posts, and conversations</span>
             </div>
@@ -177,6 +182,19 @@
       <section id="profileView" class="feed hidden">
         <div id="profileContent" class="feed-content" style="padding: 0; overflow-x: hidden;">
           <!-- Profile header and posts injected here -->
+        </div>
+      </section>
+
+      <!-- Notifications View -->
+      <section id="notificationsView" class="feed hidden">
+        <div class="sticky-header">
+          <div class="feed-tabs-container" style="justify-content: space-between; align-items: center; padding: 0 24px;">
+            <h2 style="font-size: 19px; font-weight: 800; color: #fff;">Notifications</h2>
+            <button class="btn-clear-all" id="btnClearAll">Clear All</button>
+          </div>
+        </div>
+        <div id="notificationsContent" class="feed-content" style="padding: 24px;">
+          <!-- Notifications injected here -->
         </div>
       </section>
 
@@ -255,13 +273,13 @@
               </div>
             </div>
             <div class="avatar-upload-area" id="avatarUploadArea">
-              <div class="avatar-preview" id="avatarPreview">👤</div>
+              <div class="avatar-preview" id="avatarPreview" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">👤</div>
               <div class="avatar-upload-actions">
                 <label for="avatarFileInput" class="btn-pill btn-edit" style="cursor:pointer; display:inline-block;">Choose Photo</label>
-                <input type="file" id="avatarFileInput" accept="image/*" hidden />
+                <input type="file" id="avatarFileInput" accept="image/jpeg,image/png" hidden />
                 <button type="button" id="removeAvatarBtn" class="btn-pill btn-secondary hidden">Remove</button>
               </div>
-              <p class="settings-hint" style="margin-top:8px;">JPG, PNG or GIF · Max 3MB</p>
+              <p class="settings-hint" style="margin-top:8px;">JPG, PNG · Max 3MB</p>
             </div>
             <div id="avatarLockedMsg" class="coreflow-locked-msg hidden">
               <span>🔒</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.
@@ -306,7 +324,7 @@
               </div>
               <div class="avatar-upload-actions" style="margin-top: 16px;">
                 <label for="bannerFileInput" class="btn-pill btn-edit" style="cursor:pointer; display:inline-block;">Choose Banner</label>
-                <input type="file" id="bannerFileInput" accept="image/*" hidden />
+                <input type="file" id="bannerFileInput" accept="image/jpeg,image/png" hidden />
                 <button type="button" id="removeBannerBtn" class="btn-pill btn-secondary hidden">Remove</button>
               </div>
               <p class="settings-hint" style="margin-top:8px;">Recommended size: 1500x500 · JPG, PNG · Max 5MB</p>
@@ -318,7 +336,51 @@
           <div class="settings-placeholder" style="margin-top: 24px;">More design settings coming soon...</div>
         </div>
         <div id="tab-security" class="settings-tab-content hidden">
-          <div class="settings-placeholder">Security settings coming soon...</div>
+          <div class="settings-group">
+            <div class="settings-label">Sync Email</div>
+            <div class="settings-hint">Sync your Gmail to verify your account and unlock premium features.</div>
+            
+            <div id="emailSyncStatus" class="email-sync-status unverified" style="margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.05); display: flex; align-items: center; gap: 12px;">
+              <span class="status-icon" style="font-size: 20px;">⚠️</span>
+              <div style="flex: 1;">
+                <div class="status-text" style="font-weight: 700; color: #fff;">Not Synced</div>
+                <div style="font-size: 11px; opacity: 0.5;">Required for premium & verification</div>
+              </div>
+            </div>
+
+            <div id="syncEmailForm" style="margin-top: 20px;">
+              <div style="display: flex; gap: 8px;">
+                <input type="email" id="syncEmailInput" class="settings-input" placeholder="yourname@gmail.com" style="margin: 0;" />
+                <button id="btnRequestSync" class="btn-pill btn-edit" style="white-space: nowrap;">Send Code</button>
+              </div>
+            </div>
+
+            <div id="verifySyncForm" class="hidden" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--panel-border);">
+              <div class="settings-label">Enter 6-digit Code</div>
+              <div class="settings-hint" style="margin-bottom: 12px;">Sent to <span id="syncEmailAddress" style="color: #fff; font-weight: 600;"></span></div>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="syncCodeInput" class="settings-input" placeholder="000000" maxlength="6" style="margin: 0; text-align: center; letter-spacing: 4px; font-weight: 800; font-size: 20px;" />
+                <button id="btnVerifySync" class="btn-pill btn-edit" style="white-space: nowrap;">Verify</button>
+              </div>
+              <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <button id="btnCancelSync" class="btn-text" style="font-size: 12px; opacity: 0.5; background: none; border: none; color: #fff; cursor: pointer; padding: 0;">Cancel</button>
+                <span style="font-size: 11px; opacity: 0.4;">Expires in 10m</span>
+              </div>
+            </div>
+
+            <div id="syncedEmailInfo" class="hidden" style="margin-top: 16px; padding: 16px; background: rgba(124, 58, 237, 0.1); border-radius: 12px; border: 1px solid rgba(124, 58, 237, 0.2);">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 16px;">✅</div>
+                <div>
+                  <div id="syncedEmailDisplay" style="font-weight: 700; color: #fff;"></div>
+                  <div style="font-size: 12px; color: #a78bfa;">Synced & Verified Account</div>
+                </div>
+              </div>
+              <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(124, 58, 237, 0.2); font-size: 12px; opacity: 0.8; line-height: 1.4;">
+                Your account is now synced. Premium features and the verified badge are active.
+              </div>
+            </div>
+          </div>
         </div>
         <div id="tab-privacy" class="settings-tab-content hidden">
           <div class="settings-placeholder">Privacy settings coming soon...</div>
@@ -351,7 +413,7 @@
           <span class="feature-icon">🖼️</span>
           <div>
             <h4>Custom Avatars</h4>
-            <p>Upload your own profile picture (JPG, PNG, GIF).</p>
+            <p>Upload your own profile picture (JPG, PNG).</p>
           </div>
         </div>
         <div class="premium-feature-item">
@@ -382,22 +444,37 @@
   <!-- Mobile Bottom Nav -->
   <nav class="mobile-nav">
     <a href="#" class="mobile-nav-item active" id="mobNavFeed">
-      <span class="ico">📰</span>
+      <span class="ico"><img src="./assets/home.png" width="24" height="24"></span>
       <span>Feed</span>
     </a>
     <a href="#" class="mobile-nav-item" id="mobNavSearch">
-      <span class="ico">🔍</span>
+      <span class="ico"><img src="./assets/search.png" width="24" height="24"></span>
       <span>Search</span>
     </a>
-    <a href="#" class="mobile-nav-item" id="mobNavNotifications">
-      <span class="ico">🔔</span>
+    <a href="#" class="mobile-nav-item" id="mobNavNotifications" style="position: relative;">
+      <span class="ico"><img src="./assets/bell.png" width="24" height="24"></span>
       <span>Alerts</span>
+      <div id="mobUnreadBadge" style="position: absolute; top: 8px; right: 28%; width: 8px; height: 8px; background: #ff4444; border-radius: 50%; display: none; border: 2px solid var(--bg);"></div>
     </a>
     <a href="#" class="mobile-nav-item" id="mobNavProfile">
       <span class="ico">👤</span>
       <span>Profile</span>
     </a>
   </nav>
+
+  <!-- Premium Confirmation Modal -->
+  <div id="confirmModal" class="settings-modal" style="z-index: 9999;">
+    <div class="confirm-container">
+      <div class="confirm-content">
+        <h3 id="confirmTitle">Wait!</h3>
+        <p id="confirmMessage">Are you sure you want to do this?</p>
+        <div class="confirm-actions">
+          <button id="confirmCancel" class="btn-pill btn-secondary">Cancel</button>
+          <button id="confirmProceed" class="btn-pill btn-danger">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="./script.js"></script>
 </body>

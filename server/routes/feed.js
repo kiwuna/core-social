@@ -45,6 +45,7 @@ router.get("/following", isAuthenticated, async (req, res, next) => {
         COALESCE(u.username, 'anonymous') as username,
         u.display_name,
         COALESCE(u.is_premium, 0) as is_premium,
+        COALESCE(u.is_synced, false) as is_synced,
         u.avatar_path,
         EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,

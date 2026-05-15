@@ -31,9 +31,23 @@ const initDb = async () => {
         avatar_path TEXT,
         display_name TEXT,
         banner_path TEXT,
+        email TEXT UNIQUE,
+        is_synced BOOLEAN DEFAULT FALSE,
+        sync_code TEXT,
+        last_sync_request TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add missing columns if they don't exist
+    try {
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE');
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_synced BOOLEAN DEFAULT FALSE');
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS sync_code TEXT');
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_sync_request TIMESTAMP');
+    } catch (e) {
+      console.log("Columns already exist or could not be added:", e.message);
+    }
 
     // Posts table
     await pool.query(`
@@ -111,6 +125,31 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(follower_id, following_id),
         CHECK (follower_id != following_id)
+      )
+    `);
+
+    // Verification codes table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS verification_codes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        code TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Notifications table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL, -- 'like', 'follow', 'comment'
+        post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 

@@ -4,10 +4,8 @@ const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const nodemailer = require("nodemailer");
 const { isAuthenticated } = require("../middleware/auth");
-
-const uploadsDirectory = path.join(__dirname, "..", "uploads");
-fs.mkdirSync(uploadsDirectory, { recursive: true });
 
 const { v2: cloudinary } = require("cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -22,7 +20,7 @@ const avatarStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "core_uploads",
-    format: async (req, file) => "webp",
+    format: async (req, file) => "jpg", // Force JPG to strip animation
     transformation: [{ width: 800, height: 800, crop: "fill" }]
   }
 });
@@ -38,11 +36,12 @@ const uploadAvatar = multer({
   }
 });
 
-const bannerStorage = multer.diskStorage({
-  destination(req, file, cb) { cb(null, uploadsDirectory); },
-  filename(req, file, cb) {
-    const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
-    cb(null, `banner-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+const bannerStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "core_banners",
+    format: async (req, file) => "jpg", // Force JPG to strip animation
+    transformation: [{ width: 1200, height: 400, crop: "fill" }]
   }
 });
 const uploadBanner = multer({
@@ -55,6 +54,11 @@ const uploadBanner = multer({
     cb(null, true);
   }
 });
+
+// Helper to generate 6-digit code
+function generateCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 // Signup Route
 router.post("/signup", async (req, res, next) => {
@@ -77,7 +81,7 @@ router.post("/signup", async (req, res, next) => {
     // Auto-login after signup
     req.session.userId = newUser.id;
     req.session.userEmoji = emoji;
-    res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji } });
+    res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji, is_synced: false } });
   } catch (err) {
     if (err.code === '23505') { // Postgres code for UNIQUE violation
       return res.status(400).json({ error: "Username already taken" });
@@ -107,7 +111,19 @@ router.post("/login", async (req, res, next) => {
 
     req.session.userId = user.id;
     req.session.userEmoji = user.emoji;
-    res.json({ message: "Logged in successfully", user: { id: user.id, username: user.username, emoji: user.emoji, bio: user.bio, is_premium: user.is_premium || 0, avatar_path: user.avatar_path || null } });
+    res.json({ 
+      message: "Logged in successfully", 
+      user: { 
+        id: user.id, 
+        username: user.username, 
+        emoji: user.emoji, 
+        bio: user.bio, 
+        is_premium: user.is_premium || 0, 
+        avatar_path: user.avatar_path || null,
+        isSynced: !!user.is_synced,
+        email: user.email || null
+      } 
+    });
   } catch (err) {
     next(err);
   }
@@ -136,6 +152,8 @@ router.get("/me", async (req, res, next) => {
     
     // Strip password
     const { password_hash, ...safeUser } = user;
+    safeUser.isSynced = !!user.is_synced;
+    safeUser.email = user.email || null;
     res.json({ user: safeUser });
   } catch (err) {
     next(err);
@@ -170,8 +188,10 @@ router.post("/upload-avatar", isAuthenticated, uploadAvatar.single("avatar"), as
     
     if (!user) return res.status(404).json({ error: "User not found." });
     if (!user.is_premium) {
-      // If we need to delete from cloudinary because they aren't premium, we could, but skipping for brevity
       return res.status(403).json({ error: "Custom avatars require Core Flow." });
+    }
+    if (!user.is_synced) {
+      return res.status(403).json({ error: "Please sync your email to use premium features." });
     }
 
     // req.file.path contains the Cloudinary URL
@@ -196,16 +216,13 @@ router.post("/upload-banner", isAuthenticated, uploadBanner.single("banner"), as
     
     if (!user) return res.status(404).json({ error: "User not found." });
     if (!user.is_premium) {
-      fs.unlink(req.file.path, () => {});
       return res.status(403).json({ error: "Custom banners require Core Flow." });
     }
-
-    if (user.banner_path) {
-      const oldFile = path.join(uploadsDirectory, path.basename(user.banner_path));
-      fs.unlink(oldFile, () => {});
+    if (!user.is_synced) {
+      return res.status(403).json({ error: "Please sync your email to use premium features." });
     }
 
-    const bannerPath = `/uploads/${req.file.filename}`;
+    const bannerPath = req.file.path;
     await db.query("UPDATE users SET banner_path = $1 WHERE id = $2", [bannerPath, userId]);
     res.json({ banner_path: bannerPath });
   } catch (err) {
@@ -219,13 +236,7 @@ router.post("/remove-banner", isAuthenticated, async (req, res, next) => {
   const userId = req.session.userId;
 
   try {
-    const result = await db.query("SELECT banner_path FROM users WHERE id = $1", [userId]);
-    const user = result.rows[0];
-    
-    if (user && user.banner_path) {
-      const oldFile = path.join(uploadsDirectory, path.basename(user.banner_path));
-      fs.unlink(oldFile, () => {});
-    }
+    // Banners are hosted on Cloudinary, so no local file deletion needed.
     await db.query("UPDATE users SET banner_path = NULL WHERE id = $1", [userId]);
     res.json({ message: "Banner removed" });
   } catch (err) {

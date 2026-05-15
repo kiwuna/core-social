@@ -8,6 +8,8 @@ const postsRouter = require("./routes/posts");
 const authRouter = require("./routes/auth");
 const usersRouter = require("./routes/users");
 const feedRouter = require("./routes/feed");
+const notificationsRouter = require("./routes/notifications");
+const syncRouter = require("./routes/sync");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -36,7 +38,7 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "client")));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// No local uploads needed, everything is on Cloudinary
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -97,6 +99,8 @@ app.use("/auth", authRouter);
 app.use("/posts", postsRouter);
 app.use("/users", usersRouter);
 app.use("/feed", feedRouter);
+app.use("/notifications", notificationsRouter);
+app.use("/api", syncRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

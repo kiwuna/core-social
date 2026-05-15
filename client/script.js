@@ -15,6 +15,46 @@ function timeAgo(date) {
   if (interval > 1) return Math.floor(interval) + "m";
   return Math.floor(seconds) + "s";
 }
+
+function formatSocialDate(dateInput) {
+  const date = new Date(dateInput);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now - date) / 1000);
+  
+  // 1-30 mins
+  if (diffInSeconds < 1800) {
+    const mins = Math.max(1, Math.floor(diffInSeconds / 60));
+    return `${mins}m`;
+  }
+  
+  // Up to 1h
+  if (diffInSeconds < 3600) {
+    return `${Math.floor(diffInSeconds / 60)}m`;
+  }
+  
+  // 1h - 23h
+  if (diffInSeconds < 86400) {
+    return `${Math.floor(diffInSeconds / 3600)}h`;
+  }
+  
+  // 1d - 7d
+  if (diffInSeconds < 604800) {
+    return `${Math.floor(diffInSeconds / 86400)}d`;
+  }
+  
+  // Dates like 26/4
+  const day = date.getDate();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  
+  // If year 2027 comes, show 26/4/26 (User said 26/4/26 for 2027, so YY format)
+  if (now.getFullYear() >= 2027) {
+    const shortYear = String(year).slice(-2);
+    return `${day}/${month}/${shortYear}`;
+  }
+  
+  return `${day}/${month}`;
+}
 function formatNumber(num) {
   if (!num) return "0";
   if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
@@ -29,6 +69,7 @@ const profileContent = document.getElementById("profileContent");
 const settingsModal = document.getElementById("settingsModal");
 const closeSettings = document.getElementById("closeSettings");
 const saveProfile = document.getElementById("saveProfile");
+
 const settingsNavItems = document.querySelectorAll(".settings-nav-item");
 const settingsTabContents = document.querySelectorAll(".settings-tab-content");
 const settingsDisplayName = document.getElementById("settingsDisplayName");
@@ -53,6 +94,8 @@ const pollQuestionInput = document.getElementById("pollQuestion");
 // Views
 const feedView = document.getElementById("feedView");
 const searchView = document.getElementById("searchView");
+const notificationsView = document.getElementById("notificationsView");
+const notificationsContent = document.getElementById("notificationsContent");
 
 // Nav
 const navFeed = document.getElementById("navFeed");
@@ -112,13 +155,35 @@ const coreFlowModal = document.getElementById("coreFlowModal");
 const closeCoreFlow = document.getElementById("closeCoreFlow");
 const activateCoreFlowModal = document.getElementById("activateCoreFlowModal");
 
+// Sync Email Elements
+const emailSyncStatus = document.getElementById("emailSyncStatus");
+const syncEmailForm = document.getElementById("syncEmailForm");
+const syncEmailInput = document.getElementById("syncEmailInput");
+const btnRequestSync = document.getElementById("btnRequestSync");
+const verifySyncForm = document.getElementById("verifySyncForm");
+const syncEmailAddress = document.getElementById("syncEmailAddress");
+const syncCodeInput = document.getElementById("syncCodeInput");
+const btnVerifySync = document.getElementById("btnVerifySync");
+const btnCancelSync = document.getElementById("btnCancelSync");
+const syncedEmailInfo = document.getElementById("syncedEmailInfo");
+const syncedEmailDisplay = document.getElementById("syncedEmailDisplay");
+
 // Mobile Elements
 const mobileMenuBtn = document.getElementById("mobileMenuBtn");
 const mobNavFeed = document.getElementById("mobNavFeed");
 const mobNavSearch = document.getElementById("mobNavSearch");
 const mobNavNotifications = document.getElementById("mobNavNotifications");
 const mobNavProfile = document.getElementById("mobNavProfile");
+const mobNavProfileIcon = mobNavProfile ? mobNavProfile.querySelector('.ico') : null;
 const userEmojiMobile = document.getElementById("userEmojiMobile");
+
+// Global UI Elements
+const confirmModal = document.getElementById("confirmModal");
+const confirmTitle = document.getElementById("confirmTitle");
+const confirmMessage = document.getElementById("confirmMessage");
+const confirmCancel = document.getElementById("confirmCancel");
+const confirmProceed = document.getElementById("confirmProceed");
+const checkoutForm = document.querySelector('form[action="/create-checkout-session"]');
 
 // Create Sidebar Overlay
 const sidebarOverlay = document.createElement("div");
@@ -128,14 +193,20 @@ document.body.appendChild(sidebarOverlay);
 function showFeedback(message, type = "info") {
   if (!feedbackMessage) return;
   feedbackMessage.textContent = message;
-  feedbackMessage.className = `feedback-message ${type}`;
+  feedbackMessage.className = `feedback-message ${type} show`;
   if (!message) return;
+  
   setTimeout(() => {
     if (feedbackMessage.textContent === message) {
-      feedbackMessage.textContent = "";
-      feedbackMessage.className = "feedback-message";
+      feedbackMessage.classList.remove("show");
+      setTimeout(() => {
+        if (!feedbackMessage.classList.contains("show")) {
+          feedbackMessage.textContent = "";
+          feedbackMessage.className = "feedback-message";
+        }
+      }, 400);
     }
-  }, 2200);
+  }, 3000);
 }
 
 function setPostFormState(loading) {
@@ -174,12 +245,14 @@ function updateAuthUI() {
     userNameDisplay.textContent = currentUser.display_name || currentUser.username;
     userNameDisplay.classList.toggle('premium-name-gradient', !!currentUser.is_premium);
     userHandleDisplay.textContent = `@${currentUser.username.toLowerCase()}`;
-    userEmojiLarge.textContent = currentUser.emoji;
+    userEmojiLarge.textContent = currentUser.emoji || "👤";
+    if (mobNavProfileIcon) mobNavProfileIcon.textContent = currentUser.emoji || "👤";
+
     if (userEmojiMini) {
       if (currentUser.is_premium && currentUser.avatar_path) {
         userEmojiMini.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
       } else {
-        userEmojiMini.textContent = currentUser.emoji;
+        userEmojiMini.textContent = currentUser.emoji || "👻";
       }
       userEmojiMini.classList.toggle('round-avatar', !!currentUser.is_premium);
     }
@@ -188,7 +261,7 @@ function updateAuthUI() {
       if (currentUser.is_premium && currentUser.avatar_path) {
         userEmojiMobile.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
       } else {
-        userEmojiMobile.textContent = currentUser.emoji;
+        userEmojiMobile.textContent = currentUser.emoji || "👻";
       }
       userEmojiMobile.classList.toggle('round-avatar', !!currentUser.is_premium);
     }
@@ -199,22 +272,36 @@ function updateAuthUI() {
     const isPremium = !!currentUser.is_premium;
 
     if (avatarUploadArea) {
-      avatarUploadArea.classList.toggle('locked', !isPremium);
-      avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+      avatarUploadArea.classList.toggle('locked', !isPremium || !currentUser.isSynced);
+      avatarUploadArea.style.pointerEvents = (isPremium && currentUser.isSynced) ? 'auto' : 'none';
     }
-    if (avatarLockedMsg) avatarLockedMsg.classList.toggle('hidden', isPremium);
+    if (avatarLockedMsg) {
+      avatarLockedMsg.classList.toggle('hidden', isPremium && currentUser.isSynced);
+      if (isPremium && !currentUser.isSynced) {
+        avatarLockedMsg.innerHTML = '<span>🔒</span> Please <strong>Sync Email</strong> in Settings > Security to unlock.';
+      } else if (!isPremium) {
+        avatarLockedMsg.innerHTML = '<span>🔒</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
+      }
+    }
 
     if (bannerUploadArea) {
-      bannerUploadArea.classList.toggle('locked', !isPremium);
-      bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+      bannerUploadArea.classList.toggle('locked', !isPremium || !currentUser.isSynced);
+      bannerUploadArea.style.pointerEvents = (isPremium && currentUser.isSynced) ? 'auto' : 'none';
     }
-    if (bannerLockedMsg) bannerLockedMsg.classList.toggle('hidden', isPremium);
+    if (bannerLockedMsg) {
+      bannerLockedMsg.classList.toggle('hidden', isPremium && currentUser.isSynced);
+      if (!currentUser.isSynced) {
+        bannerLockedMsg.innerHTML = '<span>🔒</span> Please <strong>Sync Email</strong> in Settings > Security to unlock.';
+      } else {
+        bannerLockedMsg.innerHTML = '<span>🔒</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
+      }
+    }
 
     if (avatarPreview) {
       if (isPremium && currentUser.avatar_path) {
         avatarPreview.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
       } else {
-        avatarPreview.textContent = currentUser.emoji;
+        avatarPreview.textContent = currentUser.emoji || "👤";
       }
     }
 
@@ -236,6 +323,7 @@ function updateAuthUI() {
     userNameDisplay.textContent = "Profile";
     userHandleDisplay.textContent = "@anonymous";
     userEmojiLarge.textContent = "👤";
+    if (mobNavProfileIcon) mobNavProfileIcon.textContent = "👤";
     if (userEmojiMini) {
       userEmojiMini.textContent = "👻";
       userEmojiMini.classList.remove('premium-ring', 'round-avatar');
@@ -285,15 +373,13 @@ function createPostElement(post) {
   const isOwner = currentUser && post.user_id === currentUser.id;
   const isPremiumPost = !!post.is_premium;
 
-  // Avatar: custom image or emoji
+  // Avatar: custom image or the new default image
   const avatarInner = (isPremiumPost && post.avatar_path)
     ? `<img src="${post.avatar_path.startsWith('http') ? post.avatar_path : API_URL + post.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`
-    : displayEmoji;
+    : (post.emoji || "👻");
 
-  // Verified badge
-  const verifiedBadge = isPremiumPost
-    ? `<span class="verified-check" title="Core Flow"></span>`
-    : '';
+  // Verified badge (Removed from feed per request)
+  const verifiedBadge = "";
 
   postElement.innerHTML = `
     <div class="post-head">
@@ -338,7 +424,7 @@ function createPostElement(post) {
       e.stopPropagation();
       const uid = el.dataset.userId;
       if (uid && uid !== "null" && uid !== "undefined" && displayUser !== "anonymous") {
-         showProfile(uid);
+         MapsTo('profile/' + uid);
       } else {
          showFeedback("This is an anonymous or deleted user.", "info");
       }
@@ -485,8 +571,60 @@ function hideAllViews() {
   feedView.classList.add("hidden");
   if (searchView) searchView.classList.add("hidden");
   profileView.classList.add("hidden");
+  if (notificationsView) notificationsView.classList.add("hidden");
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
 }
+
+window.MapsTo = function(viewPath, push = true) {
+  const parts = viewPath.split('/');
+  const view = parts[0];
+  const id = parts[1];
+  
+  if (push) {
+    window.history.pushState({ viewPath }, "", `#${viewPath}`);
+  }
+
+  // Close modals if we navigate to a main view
+  if (view !== 'settings') {
+    if (settingsModal) settingsModal.classList.remove("show");
+  }
+
+  switch(view) {
+    case 'feed':
+      showFeed();
+      break;
+    case 'search':
+      showSearchView();
+      break;
+    case 'profile':
+      showProfile(id);
+      break;
+    case 'notifications':
+      showNotifications();
+      break;
+    case 'post':
+    case 'comments':
+      showSinglePost(id);
+      break;
+    case 'settings':
+      openSettings(id || 'account', false);
+      break;
+    default:
+      showFeed();
+  }
+};
+
+window.onpopstate = (event) => {
+  const hash = window.location.hash.slice(1);
+  if (event.state && event.state.viewPath) {
+    MapsTo(event.state.viewPath, false);
+  } else if (hash) {
+    MapsTo(hash, false);
+  } else {
+    if (settingsModal) settingsModal.classList.remove("show");
+    showFeed();
+  }
+};
 
 async function showProfile(userId) {
   console.log("Loading profile for user:", userId);
@@ -517,7 +655,7 @@ async function showProfile(userId) {
 
     profileContent.innerHTML = `
       <div class="profile-nav-top">
-        <button class="back-btn" onclick="showFeed()">
+        <button class="back-btn" onclick="MapsTo('feed')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
         </button>
         <div class="mini-profile-info">
@@ -527,16 +665,13 @@ async function showProfile(userId) {
       </div>
       <div class="profile-header">
         <div class="profile-banner" style="${userData.is_premium && userData.banner_path ? `background-image: url(${userData.banner_path}?v=${Date.now()}) !important; background-size: cover; background-position: center;` : ''}">
-          <div style="position: absolute; bottom: 20px; right: 20px;">
-             <button class="btn-pill btn-secondary" onclick="openSettings('design')">🎨 Theme</button>
-          </div>
         </div>
         <div class="profile-avatar-area">
           <div class="large-avatar-wrap ${userData.is_premium ? 'round-avatar' : ''}">
             <div class="large-avatar">
               ${(userData.is_premium && userData.avatar_path) 
                 ? `<img src="${userData.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
-                : userData.emoji}
+                : userData.emoji || '👤'}
             </div>
             <div class="status-indicator"></div>
           </div>
@@ -551,7 +686,8 @@ async function showProfile(userId) {
       <div class="profile-info">
         <h2 style="display:flex;align-items:center;gap:8px;">
           <span class="${userData.is_premium ? 'premium-name-gradient' : ''}">${userData.display_name || userData.username}</span>
-          ${userData.is_premium ? `<span class="verified-check" title="Core Flow" style="width:22px;height:22px;"></span>` : ''}
+          ${(userData.is_premium) ? `<span class="verified-check-white" title="Verified Account"></span>` : ((userData.isSynced || userData.is_synced) ? `<span class="verified-check" title="Verified Account"></span>` : '')}
+          ${userData.is_premium ? `<span class="premium-check" title="Core Flow" style="width:22px;height:22px; display:inline-block; background: url('./assets/star.png'); background-size: contain;"></span>` : ''}
         </h2>
         <p class="handle">@${userData.username.toLowerCase()}</p>
         
@@ -563,7 +699,7 @@ async function showProfile(userId) {
         </div>
         
         <div class="profile-meta">
-          <span>📅 Registered: ${regDate}</span>
+          <span>Registered: ${regDate}</span>
         </div>
       </div>
 
@@ -578,13 +714,40 @@ async function showProfile(userId) {
     `;
 
     const profilePosts = document.getElementById("profilePosts");
-    if (userPosts.length === 0) {
-      profilePosts.innerHTML = `<p style="color: var(--muted); text-align: center; padding: 40px;">No posts yet.</p>`;
-    } else {
-      userPosts.forEach(post => {
-        profilePosts.appendChild(createPostElement(post));
-      });
-    }
+    const tabPosts = profileContent.querySelector('.profile-tabs .tab:nth-child(1)');
+    const tabLikes = profileContent.querySelector('.profile-tabs .tab:nth-child(2)');
+
+    const renderPosts = (posts) => {
+      profilePosts.innerHTML = "";
+      if (posts.length === 0) {
+        profilePosts.innerHTML = `<p style="color: var(--muted); text-align: center; padding: 40px;">No posts yet.</p>`;
+      } else {
+        posts.forEach(post => {
+          profilePosts.appendChild(createPostElement(post));
+        });
+      }
+    };
+
+    renderPosts(userPosts);
+
+    tabPosts.addEventListener('click', () => {
+      tabPosts.classList.add('active');
+      tabLikes.classList.remove('active');
+      renderPosts(userPosts);
+    });
+
+    tabLikes.addEventListener('click', async () => {
+      tabLikes.classList.add('active');
+      tabPosts.classList.remove('active');
+      profilePosts.innerHTML = `<div style="padding: 40px; color: var(--muted); text-align: center;">Loading likes...</div>`;
+      try {
+        const likesRes = await fetch(`/users/${userId}/likes`);
+        const likedPosts = await likesRes.json();
+        renderPosts(likedPosts);
+      } catch (e) {
+        showFeedback("Could not load likes", "error");
+      }
+    });
     
 
 
@@ -600,7 +763,7 @@ async function showProfile(userId) {
       <div style="padding: 100px 40px; text-align: center;">
         <h2 style="font-size: 24px; margin-bottom: 16px; color: #fff;">Profile Unavailable</h2>
         <p style="color: var(--muted); margin-bottom: 32px;">This user might have been deleted or never existed.</p>
-        <button class="btn-pill btn-edit" onclick="showFeed()">Return to Feed</button>
+        <button class="btn-pill btn-edit" onclick="MapsTo('feed')">Return to Feed</button>
       </div>
     `;
   }
@@ -620,6 +783,192 @@ function showSearchView() {
   navSearch.classList.add("active");
   setMobileNavActive("mobNavSearch");
   setTimeout(() => searchInput && searchInput.focus(), 100);
+}
+
+async function showNotifications() {
+  hideAllViews();
+  notificationsView.classList.remove("hidden");
+  if (navNotifications) navNotifications.classList.add("active");
+  setMobileNavActive("mobNavNotifications");
+  
+  notificationsContent.innerHTML = `<div style="padding: 40px; color: var(--muted); text-align: center;">Loading...</div>`;
+  
+  try {
+    const res = await fetch("/notifications");
+    const notifications = await res.json();
+    
+    if (notifications.length === 0) {
+      notificationsContent.innerHTML = `<div style="padding: 80px 20px; text-align: center; color: var(--muted);">
+        <div style="margin-bottom: 20px; opacity: 0.5;"><img src="./assets/bell.png" width="48" height="48"></div>
+        <p style="font-weight: 700; font-size: 18px; color: rgba(255,255,255,0.6);">No notifications yet</p>
+        <p style="font-size: 14px; margin-top: 8px;">Interactions with your profile will appear here.</p>
+      </div>`;
+      return;
+    }
+
+    notificationsContent.innerHTML = "";
+    notifications.forEach(n => {
+      const el = document.createElement("div");
+      el.className = `notification-item ${n.is_read ? '' : 'unread'}`;
+      el.style = "padding: 16px; border-bottom: 1px solid var(--panel-border); display: flex; gap: 16px; align-items: flex-start; cursor: pointer;";
+      el.dataset.id = n.id;
+      
+      let text = "";
+      let icon = "";
+      if (n.type === 'like') { text = "liked your post"; icon = "❤️"; }
+      else if (n.type === 'follow') { text = "started following you"; icon = "👤"; }
+      else if (n.type === 'comment') { text = "commented on your post"; icon = "💬"; }
+
+      el.innerHTML = `
+        <div class="mini-avatar" style="width: 44px; height: 44px;">
+          ${n.sender_avatar ? `<img src="${n.sender_avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : (n.sender_emoji || "👤")}
+        </div>
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span style="font-weight: 800; color: #fff;">${n.sender_display_name || n.sender_username}</span>
+            <span style="font-size: 13px; color: var(--muted);">${text}</span>
+          </div>
+          ${n.post_content ? `<p style="font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.8;">${n.post_content}</p>` : ""}
+          <span style="font-size: 11px; color: var(--muted); opacity: 0.5; margin-top: 4px; display: block;">${timeAgo(new Date(n.created_at))}</span>
+        </div>
+        <div style="font-size: 18px; opacity: 0.6;">${icon}</div>
+        <div class="notification-swipe-action" onclick="deleteNotification('${n.id}', this.parentElement)">Delete</div>
+      `;
+      
+      // Right Click to Delete
+      el.oncontextmenu = (e) => {
+        e.preventDefault();
+        deleteNotification(n.id, el);
+      };
+
+      // Swipe to Delete (Mobile)
+      let touchStartX = 0;
+      el.ontouchstart = (e) => touchStartX = e.touches[0].clientX;
+      el.ontouchmove = (e) => {
+        const touchX = e.touches[0].clientX;
+        const diff = touchStartX - touchX;
+        if (diff > 50) el.classList.add('swiped');
+        if (diff < -50) el.classList.remove('swiped');
+        
+        // Auto-delete on deep swipe
+        if (diff > 150) {
+           el.style.transition = 'transform 0.2s';
+           el.style.transform = 'translateX(-100%)';
+           setTimeout(() => deleteNotification(n.id, el), 200);
+        }
+      };
+
+      el.onclick = (e) => {
+        if (e.target.classList.contains('notification-swipe-action')) return;
+        if (n.post_id) {
+          MapsTo('post/' + n.post_id);
+        } else {
+          MapsTo('profile/' + n.sender_id);
+        }
+      };
+      notificationsContent.appendChild(el);
+    });
+
+    // Mark all as read
+    fetch("/notifications/read", { method: "POST" });
+    updateNotificationBadge(false);
+  } catch (err) {
+    notificationsContent.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--muted);">Error loading notifications.</div>`;
+  }
+}
+
+async function deleteNotification(id, element) {
+  showConfirm("Remove Notice?", "This notification will be permanently deleted from your feed.", async () => {
+    try {
+      const res = await fetch(`/notifications/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        element.style.transform = "translateX(-100%)";
+        element.style.opacity = "0";
+        setTimeout(() => {
+          element.remove();
+          if (notificationsContent.children.length === 0) {
+              showNotifications(); // Show empty state
+          }
+        }, 300);
+        showFeedback("Notification removed", "success");
+      }
+    } catch (e) {
+      showFeedback("Failed to delete", "error");
+    }
+  });
+}
+
+async function clearAllNotifications() {
+  showConfirm("Clear All?", "All notifications will be permanently removed. This cannot be undone.", async () => {
+    try {
+      const res = await fetch("/notifications/clear-all", { method: "DELETE" });
+      if (res.ok) {
+        MapsTo('notifications');
+        showFeedback("Inbox cleared", "success");
+      }
+    } catch (e) {
+      showFeedback("Failed to clear inbox", "error");
+    }
+  });
+}
+
+// Custom Confirmation Modal Logic
+
+function showConfirm(title, message, onConfirm) {
+  if (!confirmModal) return;
+  confirmTitle.textContent = title;
+  confirmMessage.textContent = message;
+  confirmModal.classList.add("show");
+
+  const close = () => confirmModal.classList.remove("show");
+  
+  confirmCancel.onclick = close;
+  confirmProceed.onclick = async () => {
+    close();
+    await onConfirm();
+  };
+}
+
+async function updateNotificationBadge(hasUnread) {
+  const badge = document.getElementById("unreadBadge");
+  const mobBadge = document.getElementById("mobUnreadBadge");
+  if (badge) badge.style.display = hasUnread ? "block" : "none";
+  if (mobBadge) mobBadge.style.display = hasUnread ? "block" : "none";
+}
+
+async function checkUnreadNotifications() {
+  if (!currentUser) return;
+  try {
+    const res = await fetch("/notifications");
+    const notifications = await res.json();
+    const hasUnread = notifications.some(n => !n.is_read);
+    updateNotificationBadge(hasUnread);
+  } catch (e) {}
+}
+
+async function showSinglePost(postId) {
+  hideAllViews();
+  feedView.classList.remove("hidden");
+  const postsList = document.getElementById("feedPosts");
+  postsList.innerHTML = `<div style="padding: 40px; color: var(--muted); text-align: center;">Loading post...</div>`;
+  
+  try {
+    // We can reuse the existing search API or add a specific one. 
+    // For now, let's just fetch all posts and find the one. 
+    // Ideally, we'd have GET /posts/:id
+    const res = await fetch(`/posts`);
+    const allPosts = await res.json();
+    const post = allPosts.find(p => p.id === Number(postId));
+    
+    postsList.innerHTML = "";
+    if (post) {
+      postsList.appendChild(createPostElement(post));
+    } else {
+      postsList.innerHTML = `<div style="padding: 40px; color: var(--muted); text-align: center;">Post not found.</div>`;
+    }
+  } catch (e) {
+    showFeedback("Error loading post", "error");
+  }
 }
 
 // ═══════════════════════════════════════
@@ -651,7 +1000,7 @@ if (mobNavFeed) {
   mobNavFeed.addEventListener("click", (e) => {
     e.preventDefault();
     setMobileNavActive("mobNavFeed");
-    showFeed();
+    MapsTo('feed');
   });
 }
 
@@ -659,7 +1008,7 @@ if (mobNavSearch) {
   mobNavSearch.addEventListener("click", (e) => {
     e.preventDefault();
     setMobileNavActive("mobNavSearch");
-    showSearchView();
+    MapsTo('search');
   });
 }
 
@@ -667,7 +1016,7 @@ if (mobNavNotifications) {
   mobNavNotifications.addEventListener("click", (e) => {
     e.preventDefault();
     setMobileNavActive("mobNavNotifications");
-    showFeedback("Notifications coming soon!");
+    MapsTo('notifications');
   });
 }
 
@@ -679,7 +1028,7 @@ if (mobNavProfile) {
       return;
     }
     setMobileNavActive("mobNavProfile");
-    showProfile(currentUser.id);
+    MapsTo('profile/' + currentUser.id);
   });
 }
 
@@ -701,7 +1050,9 @@ async function performSearch(query) {
   if (!query || query.length < 1) {
     searchResults.innerHTML = `
       <div class="search-empty-state">
-        <div class="search-empty-icon">🔍</div>
+        <div class="search-empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:48px;height:48px;opacity:0.5;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </div>
         <p>Start typing to search</p>
         <span>Find users, posts, and conversations</span>
       </div>`;
@@ -760,7 +1111,9 @@ function renderSearchResults(query) {
   if (data.length === 0) {
     searchResults.innerHTML = `
       <div class="search-no-results">
-        <div class="search-empty-icon">😶</div>
+        <div class="search-empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:48px;height:48px;opacity:0.5;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </div>
         <p>No ${isUsers ? 'people' : 'posts'} found</p>
         <span>Try a different search term</span>
       </div>`;
@@ -785,10 +1138,13 @@ function renderUserResults(users, query) {
   let html = `<div class="search-results-count">${users.length} people found</div>`;
   
   users.forEach((user, i) => {
+    const avatarHtml = user.avatar_path 
+      ? `<img src="${user.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+      : user.emoji || "👤";
     const bioSnippet = user.bio ? `<div class="search-user-bio">${highlightText(user.bio, query)}</div>` : '';
     html += `
       <div class="search-user-card" data-user-id="${user.id}" style="animation-delay: ${i * 0.05}s">
-        <div class="search-user-avatar">${user.emoji || '👤'}</div>
+        <div class="search-user-avatar">${avatarHtml}</div>
         <div class="search-user-info">
           <div class="search-user-name">${highlightText(user.username, query)}</div>
           <div class="search-user-handle">@${user.username.toLowerCase()}</div>
@@ -806,7 +1162,7 @@ function renderUserResults(users, query) {
   searchResults.querySelectorAll('.search-user-card').forEach(card => {
     card.addEventListener('click', () => {
       const uid = card.dataset.userId;
-      if (uid) showProfile(uid);
+      if (uid) MapsTo('profile/' + uid);
     });
   });
 }
@@ -936,9 +1292,21 @@ if (pickImageButton) {
 if (imageInput) {
   imageInput.addEventListener("change", () => {
     const file = imageInput.files && imageInput.files[0];
-    if (file && file.type.startsWith("image/")) {
-      selectedImageFile = file;
-      updateImagePreview(file);
+    if (file) {
+      if (file.type === "image/gif") {
+        showFeedback("GIFs are not allowed.", "error");
+        imageInput.value = "";
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showFeedback("File too large. Max 5MB.", "error");
+        imageInput.value = "";
+        return;
+      }
+      if (file.type.startsWith("image/")) {
+        selectedImageFile = file;
+        updateImagePreview(file);
+      }
     }
   });
 }
@@ -995,11 +1363,13 @@ logoutBtn.addEventListener("click", async () => {
   if (res.ok) window.location.reload();
 });
 
-navFeed.addEventListener("click", (e) => { e.preventDefault(); showFeed(); });
-if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); showSearchView(); });
+navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
+if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo('search'); });
+if (document.getElementById("navNotifications")) document.getElementById("navNotifications").addEventListener("click", (e) => { e.preventDefault(); MapsTo('notifications'); });
+if (document.getElementById("btnClearAll")) document.getElementById("btnClearAll").addEventListener("click", () => clearAllNotifications());
 navProfile.addEventListener("click", (e) => { 
   e.preventDefault(); 
-  if (currentUser) showProfile(currentUser.id); 
+  if (currentUser) MapsTo('profile/' + currentUser.id); 
   else window.location.href = "login.html";
 });
 
@@ -1104,26 +1474,42 @@ async function toggleComments(postId, postElement) {
   const container = postElement.querySelector(".comments-container");
   if (!container) return;
 
-  if (!container.classList.contains("hidden")) {
+  if (!container.classList.contains("hidden") && container.innerHTML !== "") {
     container.classList.add("hidden");
     container.innerHTML = "";
     return;
   }
 
   container.classList.remove("hidden");
-  container.innerHTML = `<div style="padding: 10px; color: var(--muted); font-size: 13px;">Loading thoughts...</div>`;
+  container.innerHTML = `<div style="padding: 20px; color: var(--muted); text-align: center;">Loading thoughts...</div>`;
 
   try {
     const res = await fetch(`${API_URL}/posts/${postId}/comments`);
     const comments = await res.json();
     
+    renderInlineComments(postId, postElement, comments);
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 20px; color: #f87171; text-align: center;">Failed to load comments.</div>`;
+  }
+}
+
+function renderInlineComments(postId, postElement, comments) {
+    const container = postElement.querySelector(".comments-container");
     let html = `<div class="comments-section">`;
+    
     comments.forEach(c => {
+      const avatarHtml = c.avatar_path 
+        ? `<img src="${c.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+        : c.emoji || "👤";
+
       html += `
         <div class="comment">
-          <div class="mini-avatar">${c.emoji}</div>
+          <div class="mini-avatar">${avatarHtml}</div>
           <div class="comment-bubble">
-            <span class="author">${c.display_name || c.username}</span>
+            <div class="author">
+               <span class="${c.is_premium ? 'premium-name-gradient' : ''}">${c.display_name || c.username}</span>
+               <span class="comment-date">${formatSocialDate(c.created_at)}</span>
+            </div>
             <div class="text">${c.content}</div>
           </div>
         </div>
@@ -1132,22 +1518,21 @@ async function toggleComments(postId, postElement) {
 
     if (currentUser) {
       html += `
-        <form class="comment-form" data-post-id="${postId}">
+        <form class="comment-form" style="padding: 16px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 8px;">
           <input type="text" placeholder="Add your thought..." required />
           <button type="submit" class="btn-send-comment">➜</button>
         </form>
       `;
     } else {
-      html += `<p style="font-size: 12px; color: var(--muted); margin-top: 8px;">Login to join the conversation.</p>`;
+      html += `<p style="padding: 16px; font-size: 12px; color: var(--muted); text-align: center;">Login to join the conversation.</p>`;
     }
 
     html += `</div>`;
     container.innerHTML = html;
 
-    // Handle comment submission
     const form = container.querySelector(".comment-form");
     if (form) {
-      form.addEventListener("submit", async (e) => {
+      form.onsubmit = async (e) => {
         e.preventDefault();
         const input = form.querySelector("input");
         const content = input.value.trim();
@@ -1161,29 +1546,34 @@ async function toggleComments(postId, postElement) {
           });
           if (postRes.ok) {
             input.value = "";
-            toggleComments(postId, postElement); // Refresh comments
+            const refreshRes = await fetch(`${API_URL}/posts/${postId}/comments`);
+            const updatedComments = await refreshRes.json();
+            renderInlineComments(postId, postElement, updatedComments);
+            
+            // Scroll container to bottom
+            container.scrollTop = container.scrollHeight;
+            
             // Update count
             const countEl = postElement.querySelector(".comments-count");
             if (countEl) {
-              const currentText = countEl.textContent.replace(/[^0-9]/g, "");
-              const current = parseInt(currentText) || 0;
-              countEl.textContent = formatNumber(current + 1);
+                const current = parseInt(countEl.textContent.replace(/[^0-9]/g, "")) || 0;
+                countEl.textContent = formatNumber(current + 1);
             }
           }
         } catch (err) {
           showFeedback("Failed to post comment", "error");
         }
-      });
+      };
     }
-
-  } catch (err) {
-    container.innerHTML = `<div style="padding: 10px; color: #f87171;">Failed to load comments.</div>`;
-  }
 }
 
 // Settings Logic
-function openSettings(tab = "account") {
+function openSettings(tab = "account", push = true) {
   if (!currentUser) return;
+  if (push) {
+    MapsTo('settings/' + tab);
+    return;
+  }
   settingsModal.classList.add("show");
   settingsUsername.value = currentUser.username;
   if (settingsDisplayName) settingsDisplayName.value = currentUser.display_name || "";
@@ -1192,7 +1582,7 @@ function openSettings(tab = "account") {
 
   // Initialize previews
   if (currentUser.avatar_path && avatarPreview) {
-    avatarPreview.innerHTML = `<img src="${currentUser.avatar_path}" />`;
+    avatarPreview.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
     if (removeAvatarBtn) removeAvatarBtn.classList.remove("hidden");
   } else if (avatarPreview) {
     avatarPreview.innerHTML = currentUser.emoji;
@@ -1205,6 +1595,26 @@ function openSettings(tab = "account") {
   } else if (bannerPreview) {
     bannerPreview.innerHTML = `<div class="banner-placeholder">Banner Preview</div>`;
     if (removeBannerBtn) removeBannerBtn.classList.add("hidden");
+  }
+
+  // Initialize Email Sync State
+  if (currentUser.isSynced) {
+    emailSyncStatus.classList.remove("unverified");
+    emailSyncStatus.classList.add("synced");
+    emailSyncStatus.querySelector(".status-icon").textContent = "✅";
+    emailSyncStatus.querySelector(".status-text").textContent = "Verified Account";
+    syncEmailForm.classList.add("hidden");
+    verifySyncForm.classList.add("hidden");
+    syncedEmailInfo.classList.remove("hidden");
+    syncedEmailDisplay.textContent = currentUser.email || "Verified Email";
+  } else {
+    emailSyncStatus.classList.add("unverified");
+    emailSyncStatus.classList.remove("synced");
+    emailSyncStatus.querySelector(".status-icon").textContent = "⚠️";
+    emailSyncStatus.querySelector(".status-text").textContent = "Sync your Gmail";
+    syncEmailForm.classList.remove("hidden");
+    verifySyncForm.classList.add("hidden");
+    syncedEmailInfo.classList.add("hidden");
   }
 
   switchSettingsTab(tab);
@@ -1221,30 +1631,45 @@ function switchSettingsTab(tabId) {
 
   // Lock premium features
   const isPremium = currentUser && !!currentUser.is_premium;
+  const isSynced = currentUser && !!currentUser.isSynced;
   
   if (avatarUploadArea) {
-    avatarUploadArea.classList.toggle('locked', !isPremium);
-    avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+    avatarUploadArea.classList.toggle('locked', !isPremium || !isSynced);
+    avatarUploadArea.style.pointerEvents = (isPremium && isSynced) ? 'auto' : 'none';
   }
-  if (avatarLockedMsg) avatarLockedMsg.classList.toggle('hidden', isPremium);
+  if (avatarLockedMsg) {
+    avatarLockedMsg.classList.toggle('hidden', isPremium && isSynced);
+    if (isPremium && !isSynced) {
+      avatarLockedMsg.innerHTML = '<span>🔒</span> Please <strong>Sync Email</strong> in Settings > Security to unlock.';
+    } else if (!isPremium) {
+      avatarLockedMsg.innerHTML = '<span>🔒</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
+    }
+  }
   
   if (bannerUploadArea) {
-    bannerUploadArea.classList.toggle('locked', !isPremium);
-    bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+    bannerUploadArea.classList.toggle('locked', !isPremium || !isSynced);
+    bannerUploadArea.style.pointerEvents = (isPremium && isSynced) ? 'auto' : 'none';
   }
-  if (bannerLockedMsg) bannerLockedMsg.classList.toggle('hidden', isPremium);
+  if (bannerLockedMsg) {
+    bannerLockedMsg.classList.toggle('hidden', isPremium && isSynced);
+    if (!isSynced) {
+      bannerLockedMsg.innerHTML = '<span>🔒</span> Please <strong>Sync Email</strong> in Settings > Security to unlock.';
+    } else {
+      bannerLockedMsg.innerHTML = '<span>🔒</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
+    }
+  }
 }
 
 if (closeSettings) {
-  closeSettings.addEventListener("click", () => settingsModal.classList.remove("show"));
+  closeSettings.addEventListener("click", () => window.history.back());
 }
 
 settingsModal.addEventListener("click", (e) => {
-  if (e.target === settingsModal) settingsModal.classList.remove("show");
+  if (e.target === settingsModal) window.history.back();
 });
 
 settingsNavItems.forEach(btn => {
-  btn.addEventListener("click", () => switchSettingsTab(btn.dataset.tab));
+  btn.addEventListener("click", () => MapsTo('settings/' + btn.dataset.tab));
 });
 
 if (saveProfile) {
@@ -1278,10 +1703,10 @@ if (saveProfile) {
       
       // If we are on the profile page, refresh it
       if (!profileView.classList.contains("hidden")) {
-        showProfile(currentUser.id);
+        MapsTo('profile/' + currentUser.id, false);
       }
       
-      settingsModal.classList.remove("show");
+      window.history.back();
     } catch (err) {
       showFeedback(err.message, "error");
     } finally {
@@ -1433,7 +1858,7 @@ if (bannerFileInput) {
 
         // Refresh profile if visible
         if (!profileView.classList.contains("hidden") && currentUser) {
-          showProfile(currentUser.id);
+          MapsTo('profile/' + currentUser.id, false);
         }
       } else {
         const err = await res.json();
@@ -1460,7 +1885,7 @@ if (removeBannerBtn) {
         removeBannerBtn.classList.add('hidden');
         showFeedback('Banner removed', 'success');
         if (!profileView.classList.contains("hidden") && currentUser) {
-          showProfile(currentUser.id);
+          MapsTo('profile/' + currentUser.id, false);
         }
       }
     } catch (err) {
@@ -1470,11 +1895,11 @@ if (removeBannerBtn) {
 }
 
 // Navigation Listeners
-navFeed.addEventListener("click", (e) => { e.preventDefault(); showFeed(); });
-if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); showSearchView(); });
+navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
+if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo('search'); });
 navProfile.addEventListener("click", (e) => { 
   e.preventDefault(); 
-  if (currentUser) showProfile(currentUser.id); 
+  if (currentUser) MapsTo('profile/' + currentUser.id); 
   else window.location.href = "login.html";
 });
 
@@ -1490,11 +1915,49 @@ if (navCoreFlow) {
       window.location.href = "login.html";
       return;
     }
+
+    if (!currentUser.isSynced && !currentUser.is_premium) {
+      confirmTitle.textContent = "Connect Mail First";
+      confirmMessage.textContent = "You need to sync your email before upgrading to Core Flow.";
+      confirmProceed.textContent = "Add Now";
+      confirmProceed.className = "btn-pill btn-edit";
+      confirmModal.classList.add("show");
+
+      confirmProceed.onclick = () => {
+        confirmModal.classList.remove("show");
+        openSettings('security');
+      };
+      confirmCancel.onclick = () => confirmModal.classList.remove("show");
+      return;
+    }
+
     // If already premium, show account settings, otherwise show the new upgrade modal
     if (currentUser.is_premium) {
       openSettings('account');
     } else {
       if (coreFlowModal) coreFlowModal.classList.add('show');
+    }
+  });
+}
+
+// Intercept checkout form if not synced
+if (checkoutForm) {
+  checkoutForm.addEventListener("submit", (e) => {
+    if (!currentUser.isSynced && !currentUser.is_premium) {
+      e.preventDefault();
+      if (coreFlowModal) coreFlowModal.classList.remove('show');
+      
+      confirmTitle.textContent = "Connect Mail First";
+      confirmMessage.textContent = "You need to sync your email before upgrading to Core Flow.";
+      confirmProceed.textContent = "Add Now";
+      confirmProceed.className = "btn-pill btn-edit";
+      confirmModal.classList.add("show");
+
+      confirmProceed.onclick = () => {
+        confirmModal.classList.remove("show");
+        openSettings('security');
+      };
+      confirmCancel.onclick = () => confirmModal.classList.remove("show");
     }
   });
 }
@@ -1558,6 +2021,96 @@ if (activateCoreFlowModal) {
   });
 }
 
+// ═══════════════════════════════════════
+// Email Sync Interaction
+// ═══════════════════════════════════════
+
+if (btnRequestSync) {
+  btnRequestSync.addEventListener("click", async () => {
+    const email = syncEmailInput.value.trim();
+    if (!email || !email.includes("@")) {
+      showFeedback("Please enter a valid email address.", "error");
+      return;
+    }
+
+    btnRequestSync.disabled = true;
+    btnRequestSync.textContent = "...";
+
+    try {
+      const res = await fetch("/api/sync-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+
+      if (res.ok) {
+        syncEmailAddress.textContent = email;
+        syncEmailForm.classList.add("hidden");
+        verifySyncForm.classList.remove("hidden");
+        showFeedback("Verification code sent!", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Failed to send code.", "error");
+      }
+    } catch (err) {
+      showFeedback("Error connecting to server.", "error");
+    } finally {
+      btnRequestSync.disabled = false;
+      btnRequestSync.textContent = "Send Code";
+    }
+  });
+}
+
+if (btnVerifySync) {
+  btnVerifySync.addEventListener("click", async () => {
+    const email = syncEmailAddress.textContent;
+    const code = syncCodeInput.value.trim();
+
+    if (code.length !== 6) {
+      showFeedback("Please enter the 6-digit code.", "error");
+      return;
+    }
+
+    btnVerifySync.disabled = true;
+    btnVerifySync.textContent = "...";
+
+    try {
+      const res = await fetch("/api/sync-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        currentUser.isSynced = true;
+        currentUser.email = email;
+        
+        // Update UI
+        updateAuthUI();
+        openSettings('security', false);
+        showFeedback("Email synced & Verified!", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Verification failed.", "error");
+      }
+    } catch (err) {
+      showFeedback("Error connecting to server.", "error");
+    } finally {
+      btnVerifySync.disabled = false;
+      btnVerifySync.textContent = "Verify";
+    }
+  });
+}
+
+if (btnCancelSync) {
+  btnCancelSync.addEventListener("click", () => {
+    verifySyncForm.classList.add("hidden");
+    syncEmailForm.classList.remove("hidden");
+    syncCodeInput.value = "";
+  });
+}
+
 async function handleFollow(userId, button) {
   if (!currentUser) { window.location.href = "login.html"; return; }
   if (button.disabled) return;
@@ -1607,11 +2160,23 @@ async function handleFollow(userId, button) {
   if (searchParams.get("checkout") === "success") {
     showFeedback("Successfully upgraded to Core Flow!", "success");
     if (currentUser) {
-      showProfile(currentUser.id);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      window.history.replaceState({ viewPath: 'profile/' + currentUser.id }, document.title, window.location.pathname + `#profile/${currentUser.id}`);
+      MapsTo('profile/' + currentUser.id, false);
       return;
     }
   }
 
-  await loadFeed();
+  // Handle initial hash navigation
+  const hash = window.location.hash.slice(1);
+  if (hash) {
+    MapsTo(hash, false);
+  } else {
+    // Set initial state to feed without pushing to history stack
+    window.history.replaceState({ viewPath: 'feed' }, "", "#feed");
+    showFeed();
+  }
+  
+  // Notification polling
+  checkUnreadNotifications();
+  setInterval(checkUnreadNotifications, 30000); // Check every 30s
 })();

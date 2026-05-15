@@ -22,6 +22,13 @@ router.post("/:id/follow", isAuthenticated, async (req, res, next) => {
       "INSERT INTO follows (follower_id, following_id) VALUES ($1, $2)",
       [followerId, followingId]
     );
+
+    // Create follow notification
+    await db.query(
+      "INSERT INTO notifications (recipient_id, sender_id, type) VALUES ($1, $2, $3)",
+      [followingId, followerId, 'follow']
+    );
+
     res.json({ success: true, message: "Followed successfully" });
   } catch (err) {
     if (err.code === '23505') {
@@ -74,6 +81,32 @@ router.get("/:id/follow-status", async (req, res, next) => {
       followingCount: parseInt(followingCount.rows[0].count),
       isFollowing: isFollowing.rowCount > 0
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /users/:id/likes
+router.get("/:id/likes", async (req, res, next) => {
+  const db = req.app.locals.db;
+  const userId = req.params.id;
+  const currentUserId = req.session.userId || 0;
+
+  try {
+    const query = `
+      SELECT 
+        p.*, 
+        u.username, u.display_name, u.emoji, u.avatar_path, u.is_premium, u.is_synced,
+        EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
+        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
+      FROM posts p
+      JOIN likes l ON p.id = l.post_id
+      JOIN users u ON p.user_id = u.id
+      WHERE l.user_id = $2
+      ORDER BY l.created_at DESC
+    `;
+    const result = await db.query(query, [currentUserId, userId]);
+    res.json(result.rows);
   } catch (err) {
     next(err);
   }

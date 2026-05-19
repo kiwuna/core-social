@@ -2117,39 +2117,42 @@ if (activateCoreFlowModal) {
 if (btnRequestSync) {
   btnRequestSync.addEventListener("click", async () => {
     const emailInputEl = document.getElementById("email") || document.getElementById("syncEmailInput");
-    const emailValue = emailInputEl ? emailInputEl.value.trim() : "";
+    const rawEmail = emailInputEl ? emailInputEl.value.trim() : "";
     
-    if (!emailValue || !emailValue.includes("@")) {
+    if (!rawEmail || !rawEmail.includes("@")) {
       showFeedback("Please enter a valid email address.", "error");
       return;
     }
 
+    if (typeof setPostFormState === "function") setPostFormState(true);
     btnRequestSync.disabled = true;
     btnRequestSync.textContent = "...";
 
     try {
-      const res = await fetch("/api/sync-request", {
+      const response = await fetch("/api/sync-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailValue })
+        body: JSON.stringify({ email: rawEmail })
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      if (response.ok) {
+        const data = await response.json();
+        
         if (data.isSynced) {
           currentUser.isSynced = true;
-          currentUser.email = email;
+          currentUser.email = rawEmail;
           updateAuthUI();
           openSettings('security', false);
           showFeedback(data.message || "Email verified!", "success");
           return;
         }
-        syncEmailAddress.textContent = email;
+
+        syncEmailAddress.textContent = rawEmail;
         syncEmailForm.classList.add("hidden");
         verifySyncForm.classList.remove("hidden");
-        showFeedback("Verification code sent!", "success");
+        showFeedback(data.message || "Verification code sent!", "success");
       } else {
-        const err = await res.json();
+        const err = await response.json();
         showFeedback(err.error || "Failed to send code.", "error");
       }
     } catch (err) {
@@ -2157,6 +2160,7 @@ if (btnRequestSync) {
     } finally {
       btnRequestSync.disabled = false;
       btnRequestSync.textContent = "Send Code";
+      if (typeof setPostFormState === "function") setPostFormState(false);
     }
   });
 }

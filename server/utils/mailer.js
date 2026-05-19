@@ -1,27 +1,23 @@
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-// Proper Gmail SMTP config
+// FIXED: Using Resend via standard SMTP on port 465 to bypass Gmail network restrictions
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
+  host: "smtp.resend.com",
   port: 465,
-  secure: true, // true for port 465
+  secure: true,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
+    user: "resend",
+    pass: process.env.EMAIL_PASS // We will put your Resend API Key here
   }
 });
 
 /**
  * Generic function to send an email
- * NOW PROPERLY THROWS ERRORS INSTEAD OF SWALLOWING THEM
  */
 async function sendEmail(to, subject, html) {
   const mailOptions = {
-    from: `"CORE" <${process.env.EMAIL_USER}>`,
+    from: `"CORE" <${process.env.EMAIL_USER}>`, // Make sure this is verified in Resend later
     to: to,
     subject: subject,
     html: html
@@ -29,11 +25,10 @@ async function sendEmail(to, subject, html) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log("📬 Email sent successfully:", info.messageId);
+    console.log("📬 Email sent successfully via Resend:", info.messageId);
     return info;
   } catch (error) {
-    console.error("❌ SMTP Error:", error.message);
-    // THROW the error so the route can handle it properly
+    console.error("❌ Resend SMTP Error:", error.message);
     throw error;
   }
 }
@@ -59,7 +54,7 @@ async function sendVerificationEmail(to, code) {
         If you did not request this code, please ignore this email or contact support if you have concerns.
       </p>
       <div style="margin-top: 24px; font-size: 12px; color: #444;">
-        &copy; ${new Date().getFullYear()} CORE Social. Built for the future.
+        &copy; 2026 CORE Social. Built for the future.
       </div>
     </div>
   `;
@@ -88,7 +83,7 @@ async function sendUnlinkEmail(to, code) {
         If you did not request this unlink code, please secure your account immediately.
       </p>
       <div style="margin-top: 24px; font-size: 12px; color: #444;">
-        &copy; ${new Date().getFullYear()} CORE Social. Built for the future.
+        &copy; 2026 CORE Social. Built for the future.
       </div>
     </div>
   `;

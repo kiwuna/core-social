@@ -17,25 +17,37 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
   const db = req.app.locals.db;
   const userId = req.session.userId;
 
-  if (!email || !email.includes("@")) {
-    return res.status(400).json({ error: "A valid email is required." });
-  }
-
   try {
+    // 1. Fetch current user from database to check for an existing email
+    const dbResult = await db.query(
+      "SELECT email FROM users WHERE id = $1",
+      [userId]
+    );
+    const dbUser = dbResult.rows[0];
+
+    // 2. Validate and fall back to database email if req.body.email is missing/empty
+    const finalEmail = (email && typeof email === 'string' && email.trim()) 
+      ? email.trim() 
+      : (dbUser && dbUser.email ? dbUser.email.trim() : null);
+
+    if (!finalEmail || typeof finalEmail !== "string" || !finalEmail.includes("@")) {
+      return res.status(400).json({ error: "A valid email is required. Please provide a valid email address." });
+    }
+
     const code = generateCode();
 
-    // Save code and timestamp to user (BIGINT raw milliseconds)
+    // 3. Save code and timestamp to user (BIGINT raw milliseconds)
     await db.query(
       "UPDATE users SET email = $1, sync_code = $2, last_sync_request = $3 WHERE id = $4",
-      [email.toLowerCase(), code, Date.now(), userId]
+      [finalEmail.toLowerCase(), code, Date.now(), userId]
     );
 
-    // Dispatch the CORE themed email in the background without awaiting it!
-    sendVerificationEmail(email, code).catch(err => {
-      console.error(`❌ Background SMTP Dispatch failed for ${email}:`, err.message);
+    // 4. Dispatch the CORE themed email in the background without awaiting it!
+    sendVerificationEmail(finalEmail, code).catch(err => {
+      console.error(`❌ Background SMTP Dispatch failed for ${finalEmail}:`, err.message);
     });
 
-    // Instantly return success to frontend in under 1 second!
+    // 5. Instantly return success to frontend in under 1 second!
     return res.status(200).json({ 
       success: true, 
       message: "Verification code requested!" 

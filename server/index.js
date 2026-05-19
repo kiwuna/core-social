@@ -106,6 +106,15 @@ app.use("/users", usersRouter);
 app.use("/feed", feedRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/api", syncRouter);
+
+app.use("/api/sync-request", (req, res, next) => {
+  console.log("🔍 DEBUG: sync-request hit!");
+  console.log("Session:", req.session);
+  console.log("UserId:", req.session?.userId);
+  console.log("Body:", req.body);
+  next();
+});
+
 app.use("/api/admin", adminRouter);
 
 app.get("/health", (req, res) => {

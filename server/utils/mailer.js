@@ -1,7 +1,7 @@
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-// changed to 587 + secure: false to force IPv4 and bypass render's network block 🥀
+// Proper Gmail SMTP config
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS
   },
   tls: {
-    rejectUnauthorized: false, // forces connection through cloud routing 💀
+    rejectUnauthorized: true,
     minVersion: 'TLSv1.2'
   },
   debug: true,
@@ -20,7 +20,7 @@ const transporter = nodemailer.createTransport({
 
 /**
  * Generic function to send an email
- * Wrapped in try/catch to completely kill the 500 server crashes ✌️☹️
+ * NOW PROPERLY THROWS ERRORS INSTEAD OF SWALLOWING THEM
  */
 async function sendEmail(to, subject, html) {
   const mailOptions = {
@@ -35,9 +35,9 @@ async function sendEmail(to, subject, html) {
     console.log("📬 Email sent successfully:", info.messageId);
     return info;
   } catch (error) {
-    console.error("❌ SMTP Error caught safely:", error.message);
-    // return false instead of throwing so the route doesn't crash 🥀
-    return null; 
+    console.error("❌ SMTP Error:", error.message);
+    // THROW the error so the route can handle it properly
+    throw error;
   }
 }
 

@@ -85,24 +85,25 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
     );
 
 
-    // 4. Dispatch the CORE themed email in the background without awaiting it!
-
-    sendVerificationEmail(finalEmail, code).catch(err => {
-
-      console.error(`❌ Background SMTP Dispatch failed for ${finalEmail}:`, err.message);
-
-    });
-
-
-    // 5. Instantly return success to frontend in under 1 second!
-
-    return res.status(200).json({
-
-      success: true,
-
-      message: "Verification code requested!"
-
-    });
+    // 4. WAIT FOR THE EMAIL TO SEND BEFORE RESPONDING!!!
+    try {
+      await sendVerificationEmail(finalEmail, code);
+      
+      // 5. Only respond success if email actually sent
+      return res.status(200).json({
+        success: true,
+        message: "Verification code sent to your email!"
+      });
+    } catch (emailError) {
+      console.error(`❌ Failed to send verification email to ${finalEmail}:`, emailError.message);
+      
+      // Clean up the code if email failed
+      await db.query("UPDATE users SET sync_code = NULL WHERE id = $1", [userId]);
+      
+      return res.status(500).json({ 
+        error: "Failed to send verification email. Please check your email address and try again." 
+      });
+    }
 
   } catch (err) {
 
@@ -243,30 +244,24 @@ router.post("/unlink-request", isAuthenticated, async (req, res, next) => {
     );
 
 
-    // Send the CORE themed verification email asynchronously in the background
-
+    // WAIT FOR THE EMAIL TO SEND
     try {
-
-      sendVerificationEmail(user.email, code).catch(error => {
-
-        console.error('Unlink mailer error:', error);
-
+      await sendUnlinkEmail(user.email, code);
+      
+      return res.status(200).json({
+        success: true,
+        message: "Unlink verification code sent to your email!"
       });
-
-    } catch (error) {
-
-      console.error('Unlink mailer error:', error);
-
+    } catch (emailError) {
+      console.error('Unlink email failed:', emailError.message);
+      
+      // Clean up the code if email failed
+      await db.query("UPDATE users SET sync_code = NULL WHERE id = $1", [userId]);
+      
+      return res.status(500).json({ 
+        error: "Failed to send unlink email. Please try again." 
+      });
     }
-
-
-    return res.status(200).json({
-
-      success: true,
-
-      message: "Unlink verification code sent to your email!"
-
-    });
 
   } catch (err) {
 
@@ -356,4 +351,4 @@ router.post("/unlink-verify", isAuthenticated, async (req, res, next) => {
 });
 
 
-module.exports = router; 
+module.exports = router;

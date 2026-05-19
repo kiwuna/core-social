@@ -132,10 +132,14 @@ router.post("/unlink-request", isAuthenticated, async (req, res, next) => {
       [code, userId]
     );
 
-    // Send the CORE themed unlink email asynchronously in the background
-    sendUnlinkEmail(user.email, code).catch(err => {
-      console.error(`❌ Background SMTP Unlink Dispatch failed for ${user.email}:`, err.message);
-    });
+    // Send the CORE themed verification email asynchronously in the background
+    try {
+      sendVerificationEmail(user.email, code).catch(error => {
+        console.error('Unlink mailer error:', error);
+      });
+    } catch (error) {
+      console.error('Unlink mailer error:', error);
+    }
 
     return res.status(200).json({ 
       success: true, 

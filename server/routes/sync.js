@@ -66,7 +66,10 @@ router.post("/sync-verify", isAuthenticated, async (req, res, next) => {
     );
 
     const user = result.rows[0];
-    if (!user || !user.sync_code || user.sync_code !== code) {
+    const inputCode = String(code).trim();
+    const dbCode = user && user.sync_code ? String(user.sync_code).trim() : "";
+
+    if (!dbCode || dbCode !== inputCode) {
       return res.status(400).json({ error: "Invalid or expired verification code." });
     }
 
@@ -76,7 +79,11 @@ router.post("/sync-verify", isAuthenticated, async (req, res, next) => {
       [userId]
     );
 
-    res.json({ message: "Email successfully synced!", isSynced: true });
+    return res.status(200).json({ 
+      success: true, 
+      isSynced: true,
+      message: "Email successfully synced & verified!" 
+    });
   } catch (err) {
     next(err);
   }

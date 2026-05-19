@@ -2164,6 +2164,7 @@ if (btnVerifySync) {
       if (res.ok) {
         const data = await res.json();
         currentUser.isSynced = true;
+        currentUser.is_verified = true;
         currentUser.email = email;
         
         // Update UI

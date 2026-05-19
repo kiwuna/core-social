@@ -31,25 +31,43 @@ const initDb = async () => {
         avatar_path TEXT,
         display_name TEXT,
         banner_path TEXT,
-        email TEXT UNIQUE,
+        email TEXT,
         is_synced BOOLEAN DEFAULT FALSE,
+        is_verified BOOLEAN DEFAULT FALSE,
         sync_code TEXT,
         last_sync_request BIGINT,
+        warnings INTEGER DEFAULT 0,
+        warning_reasons TEXT[] DEFAULT '{}'::TEXT[],
+        is_banned BOOLEAN DEFAULT FALSE,
+        role TEXT DEFAULT 'user',
+        acknowledged_warnings INTEGER DEFAULT 0,
+        suspended_until TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
     // Add missing columns if they don't exist
-    try {
-      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE');
-      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_synced BOOLEAN DEFAULT FALSE');
-      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS sync_code TEXT');
-      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_sync_request BIGINT');
-      // Ensure it is BIGINT even if it was TIMESTAMP before
-      await pool.query('ALTER TABLE users ALTER COLUMN last_sync_request TYPE BIGINT USING (EXTRACT(EPOCH FROM last_sync_request) * 1000)::BIGINT');
-    } catch (e) {
-      console.log("Columns already exist or could not be added:", e.message);
-    }
+    const runAlter = async (query) => {
+      try {
+        await pool.query(query);
+      } catch (err) {
+        // Suppress expected column-exists errors
+      }
+    };
+
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT');
+    await runAlter('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_synced BOOLEAN DEFAULT FALSE');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS sync_code TEXT');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_sync_request BIGINT');
+    await runAlter('ALTER TABLE users ALTER COLUMN last_sync_request TYPE BIGINT USING (EXTRACT(EPOCH FROM last_sync_request) * 1000)::BIGINT');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS warnings INTEGER DEFAULT 0');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS warning_reasons TEXT[] DEFAULT \'{}\'::TEXT[]');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT \'user\'');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS acknowledged_warnings INTEGER DEFAULT 0');
+    await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMP WITH TIME ZONE DEFAULT NULL');
 
     // Posts table
     await pool.query(`

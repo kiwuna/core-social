@@ -1,23 +1,26 @@
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
+// changed to 587 + secure: false to force IPv4 and bypass render's network block 🥀
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false, 
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
-  debug: true, // shows exactly why it's failing in logs
+  tls: {
+    rejectUnauthorized: false, // forces connection through cloud routing 💀
+    minVersion: 'TLSv1.2'
+  },
+  debug: true,
   logger: true 
 });
 
 /**
  * Generic function to send an email
- * @param {string} to 
- * @param {string} subject 
- * @param {string} html 
+ * Wrapped in try/catch to completely kill the 500 server crashes ✌️☹️
  */
 async function sendEmail(to, subject, html) {
   const mailOptions = {
@@ -27,13 +30,19 @@ async function sendEmail(to, subject, html) {
     html: html
   };
 
-  return transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("📬 Email sent successfully:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("❌ SMTP Error caught safely:", error.message);
+    // return false instead of throwing so the route doesn't crash 🥀
+    return null; 
+  }
 }
 
 /**
  * Sends a clean, dark-mode CORE themed verification email
- * @param {string} to 
- * @param {string} code 
  */
 async function sendVerificationEmail(to, code) {
   const subject = `Your CORE Sync Code: ${code}`;

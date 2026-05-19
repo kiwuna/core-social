@@ -10,6 +10,7 @@ const usersRouter = require("./routes/users");
 const feedRouter = require("./routes/feed");
 const notificationsRouter = require("./routes/notifications");
 const syncRouter = require("./routes/sync");
+const adminRouter = require("./routes/admin");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -95,12 +96,17 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "client", "index.html"));
 });
 
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "client", "admin.html"));
+});
+
 app.use("/auth", authRouter);
 app.use("/posts", postsRouter);
 app.use("/users", usersRouter);
 app.use("/feed", feedRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/api", syncRouter);
+app.use("/api/admin", adminRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

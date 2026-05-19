@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CEO Command Center | Core</title>
+<link rel="icon" type="image/png" href="./favicon.png" />
+<link rel="stylesheet" href="./style.css" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* Custom dashboard styles matching Core's aesthetics */
+  body {
+    display: block;
+    overflow-x: hidden;
+    background: var(--bg);
+  }
+  
+  .admin-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 24px 60px;
+  }
+
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .admin-title-area h1 {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .admin-title-area p {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  
+  .btn-back:hover {
+    background: var(--panel-hover);
+    transform: translateY(-1px);
+  }
+
+  /* Live Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 40px;
+  }
+
+  @media (max-width: 900px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #d97706, #f59e0b); /* CEO Beige/Gold */
+    opacity: 0.8;
+  }
+
+  .stat-card.verified::before {
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  }
+
+  .stat-card.banned::before {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+  }
+
+  .stat-card.active::before {
+    background: linear-gradient(90deg, #10b981, #34d399);
+  }
+
+  .stat-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-value {
+    font-size: 36px;
+    font-weight: 900;
+    color: #fff;
+    margin-top: 10px;
+    letter-spacing: -1px;
+  }
+
+  /* CEO Actions Table */
+  .section-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    box-shadow: var(--shadow-xl);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .section-header h2 {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .search-users-bar {
+    width: 300px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 8px 16px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .users-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 14px;
+  }
+
+  .users-table th, .users-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .users-table th {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  .users-table tbody tr {
+    transition: all 0.2s;
+  }
+
+  .users-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .user-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    overflow: hidden;
+  }
+
+  .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .user-name {
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .user-handle {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .badge-role {
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: inline-block;
+  }
+
+  .badge-role.ceo { background: rgba(217, 119, 6, 0.15); color: #fbbf24; border: 1px solid rgba(217, 119, 6, 0.3); }
+  .badge-role.admin { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+  .badge-role.mod { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+  .badge-role.user { background: rgba(255, 255, 255, 0.05); color: var(--muted); }
+
+  .user-badges {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .badge-feat {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+
+  .badge-feat.premium { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+  .badge-feat.verified { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+
+  .status-text {
+    font-weight: 700;
+  }
+
+  .status-text.banned { color: #ef4444; }
+  .status-text.active { color: #10b981; }
+
+  .warnings-text {
+    font-weight: 600;
+  }
+
+  .warnings-text.high { color: #f59e0b; }
+  .warnings-text.critical { color: #ef4444; }
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-admin-action {
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 0;
+    transition: all 0.2s;
+  }
+
+  .btn-admin-action.warn {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+  }
+
+  .btn-admin-action.warn:hover {
+    background: #f59e0b;
+    color: #000;
+  }
+
+  .btn-admin-action.edit {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-admin-action.edit:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* Inline Warning Input Box */
+  .warning-reason-box {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 12px;
+    background: rgba(245, 158, 11, 0.05);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 12px;
+    animation: slideDown 0.2s ease;
+  }
+
+  .warning-reason-box input {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .warning-reason-box button {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 0;
+  }
+
+  .warning-reason-box .btn-submit { background: #f59e0b; color: #000; }
+  .warning-reason-box .btn-cancel { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+  /* Admin Edit Profile Modal */
+  .admin-modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(15px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 11000;
+  }
+
+  .admin-modal.show {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .admin-modal-content {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 500px;
+    padding: 32px;
+    box-shadow: var(--shadow-xl);
+    position: relative;
+  }
+
+  .admin-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .admin-modal-header h3 {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .admin-modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 24px;
+    cursor: pointer;
+  }
+
+  .admin-form-group {
+    margin-bottom: 20px;
+  }
+
+  .admin-form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .admin-form-group input[type="text"],
+  .admin-form-group textarea,
+  .admin-form-group select {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 12px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+  }
+
+  .admin-form-group select option {
+    background: var(--panel);
+    color: #fff;
+  }
+
+  .admin-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .admin-checkbox-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #fff;
+    cursor: pointer;
+  }
+
+  .admin-checkbox-row label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .admin-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .admin-modal-footer button {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    border: 0;
+    transition: all 0.2s;
+  }
+
+  .admin-modal-footer .btn-save {
+    background: #fff;
+    color: #000;
+  }
+
+  .admin-modal-footer .btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  .admin-modal-footer button:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Empty state */
+  .empty-state {
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
+
+  <div class="admin-container">
+    <!-- Header -->
+    <header class="admin-header">
+      <div class="admin-title-area">
+        <h1>CEO Command Center</h1>
+        <p>Core Platform God-Mode Controls & Admin Analytics</p>
+      </div>
+      <a href="/" class="btn-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Return to Feed
+      </a>
+    </header>
+
+    <!-- Stats Grid -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Total Users</span>
+        <div id="statTotalUsers" class="stat-value">0</div>
+      </div>
+      <div class="stat-card active">
+        <span class="stat-label">Active Today</span>
+        <div id="statActiveToday" class="stat-value">0</div>
+      </div>
+      <div class="stat-card banned">
+        <span class="stat-label">Banned Accounts</span>
+        <div id="statBannedAccounts" class="stat-value">0</div>
+      </div>
+      <div class="stat-card verified">
+        <span class="stat-label">Total Verified</span>
+        <div id="statTotalVerified" class="stat-value">0</div>
+      </div>
+    </section>
+
+    <!-- CEO Users Management Card -->
+    <section class="section-card">
+      <div class="section-header">
+        <h2>Registered Accounts</h2>
+        <input 
+          type="text" 
+          id="searchUsersInput" 
+          class="search-users-bar" 
+          placeholder="Filter by name or handle..." 
+        />
+      </div>
+
+      <div class="table-wrapper">
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Badges</th>
+              <th>Warnings</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <tr>
+              <td colspan="6" class="empty-state">Loading administration dashboard...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Edit User Modal -->
+  <div id="editUserModal" class="admin-modal">
+    <div class="admin-modal-content">
+      <div class="admin-modal-header">
+        <h3>Edit Profile (God Mode)</h3>
+        <button id="closeEditModal" class="admin-modal-close">&times;</button>
+      </div>
+      <form id="editUserForm">
+        <input type="hidden" id="editUserId" />
+        
+        <div class="admin-form-group">
+          <label for="editUsername">Username</label>
+          <input type="text" id="editUsername" readonly style="background: rgba(255, 255, 255, 0.02); opacity: 0.55; cursor: not-allowed; border: 1px dashed var(--panel-border);" />
+        </div>
+
+        <div class="admin-form-group">
+          <label for="editDisplayName">Display Name</label>
+          <input type="text" id="editDisplayName" readonly style="background: rgba(255, 255, 255, 0.02); opacity: 0.55; cursor: not-allowed; border: 1px dashed var(--panel-border);" />
+        </div>
+
+        <div class="admin-form-group">
+          <label for="editBio">Bio</label>
+          <textarea id="editBio" rows="3" readonly style="background: rgba(255, 255, 255, 0.02); opacity: 0.55; cursor: not-allowed; border: 1px dashed var(--panel-border); font-family: inherit; resize: none;"></textarea>
+        </div>
+
+        <div class="admin-form-group" id="mediaRemovalGroup" style="margin-top: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--panel-border);">
+          <label>Inappropriate Media Moderation</label>
+          
+          <div class="admin-checkbox-row" id="removeAvatarRow" style="display: none;">
+            <input type="checkbox" id="editRemoveAvatar" />
+            <label for="editRemoveAvatar" style="color: #f87171;">Remove Inappropriate Profile Picture</label>
+          </div>
+
+          <div class="admin-checkbox-row" id="removeBannerRow" style="display: none;">
+            <input type="checkbox" id="editRemoveBanner" />
+            <label for="editRemoveBanner" style="color: #f87171;">Remove Inappropriate Profile Banner</label>
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label for="editRole">Platform Role</label>
+          <select id="editRole">
+            <option value="user">User</option>
+            <option value="mod">Mod</option>
+            <option value="admin">Admin</option>
+            <option value="ceo">CEO</option>
+          </select>
+        </div>
+
+        <div class="admin-form-group" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--panel-border);">
+          <label>Account Status / Suspension</label>
+          
+          <div class="admin-form-group" style="margin-bottom: 16px;">
+            <select id="editSuspension">
+              <option value="none">Active (No Suspension)</option>
+              <option value="1">1 Day Suspension</option>
+              <option value="7">7 Days Suspension</option>
+              <option value="30">30 Days Suspension</option>
+              <option value="permanent">Permanent Suspension</option>
+            </select>
+          </div>
+
+          <div class="admin-checkbox-row">
+            <input type="checkbox" id="editIsPremium" />
+            <label for="editIsPremium">Core Flow Premium</label>
+          </div>
+
+          <div class="admin-checkbox-row">
+            <input type="checkbox" id="editIsSynced" />
+            <label for="editIsSynced">Synced & Verified Email</label>
+          </div>
+        </div>
+
+        <div class="admin-modal-footer">
+          <button type="button" id="cancelEdit" class="btn-cancel">Cancel</button>
+          <button type="submit" class="btn-save">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const feedbackMessage = document.getElementById("feedbackMessage");
+    const usersTableBody = document.getElementById("usersTableBody");
+    const searchUsersInput = document.getElementById("searchUsersInput");
+    
+    // Modal elements
+    const editUserModal = document.getElementById("editUserModal");
+    const closeEditModal = document.getElementById("closeEditModal");
+    const cancelEdit = document.getElementById("cancelEdit");
+    const editUserForm = document.getElementById("editUserForm");
+    
+    let allUsers = [];
+
+    function showFeedback(message, type = "info") {
+      if (!feedbackMessage) return;
+      feedbackMessage.textContent = message;
+      feedbackMessage.className = `feedback-message ${type} show`;
+      
+      setTimeout(() => {
+        if (feedbackMessage.textContent === message) {
+          feedbackMessage.classList.remove("show");
+        }
+      }, 3000);
+    }
+
+    // Authenticate and authorize admin
+    async function checkAuth() {
+      try {
+        const res = await fetch("/auth/me");
+        if (!res.ok) {
+          window.location.href = "/login.html";
+          return;
+        }
+        const data = await res.json();
+        const user = data.user;
+        const role = user.role || 'user';
+        
+        if (role !== 'admin' && role !== 'ceo' && role !== 'mod' && user.username !== 'ceo' && user.username !== 'admin') {
+          alert("Access Denied. CEO, Admin, or Mod credentials required.");
+          window.location.href = "/";
+          return;
+        }
+        
+        // Load stats and users
+        loadDashboard();
+      } catch (err) {
+        window.location.href = "/login.html";
+      }
+    }
+
+    async function loadDashboard() {
+      await Promise.all([loadStats(), loadUsers()]);
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/admin/stats");
+        if (res.ok) {
+          const stats = await res.json();
+          document.getElementById("statTotalUsers").textContent = stats.totalUsers;
+          document.getElementById("statActiveToday").textContent = stats.activeToday;
+          document.getElementById("statBannedAccounts").textContent = stats.bannedAccounts;
+          document.getElementById("statTotalVerified").textContent = stats.totalVerified;
+        }
+      } catch (err) {
+        showFeedback("Could not load metrics grid", "error");
+      }
+    }
+
+    async function loadUsers() {
+      try {
+        const res = await fetch("/api/admin/users");
+        if (res.ok) {
+          allUsers = await res.json();
+          renderUsers(allUsers);
+        } else {
+          usersTableBody.innerHTML = `<tr><td colspan="6" class="empty-state">Could not load users list.</td></tr>`;
+        }
+      } catch (err) {
+        usersTableBody.innerHTML = `<tr><td colspan="6" class="empty-state">Error listing users.</td></tr>`;
+      }
+    }
+
+    function renderUsers(users) {
+      usersTableBody.innerHTML = "";
+      if (users.length === 0) {
+        usersTableBody.innerHTML = `<tr><td colspan="6" class="empty-state">No users match your filters.</td></tr>`;
+        return;
+      }
+
+      users.forEach(user => {
+        const tr = document.createElement("tr");
+        tr.id = `user-row-${user.id}`;
+        
+        // Avatar rendering (Strictly text-based, no emojis)
+        const avatarHtml = (user.is_premium && user.avatar_path)
+          ? `<img src="${user.avatar_path}" />`
+          : `<span style="font-weight: 700; font-size: 13px; color: var(--muted);">${user.username.slice(0, 2).toUpperCase()}</span>`;
+          
+        // Badges
+        let badgesHtml = "";
+        if (user.is_premium) badgesHtml += `<span class="badge-feat premium">Premium</span> `;
+        if (user.is_synced) badgesHtml += `<span class="badge-feat verified">Verified</span>`;
+        if (!badgesHtml) badgesHtml = `<span style="color: var(--muted); font-size: 12px;">None</span>`;
+
+        // Warnings count
+        const warningsCount = user.warnings || 0;
+        let warningsClass = "";
+        if (warningsCount === 1) warningsClass = "high";
+        if (warningsCount >= 2) warningsClass = "critical";
+        
+        const reasonsTooltip = (user.warning_reasons && user.warning_reasons.length > 0)
+          ? `title="${user.warning_reasons.join('\n')}" style="cursor: help; text-decoration: underline dotted;"`
+          : "";
+
+        // Status text (Strictly text-based, no emojis)
+        let statusText = "Active";
+        let statusClass = "active";
+        if (user.is_banned) {
+          statusText = "Banned";
+          statusClass = "banned";
+        } else if (user.suspended_until && new Date(user.suspended_until) > new Date()) {
+          const diffMs = new Date(user.suspended_until) - Date.now();
+          const diffDays = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+          statusText = `Suspended (${diffDays}d left)`;
+          statusClass = "banned";
+        }
+
+        tr.innerHTML = `
+          <td>
+            <div class="user-cell">
+              <div class="user-avatar">${avatarHtml}</div>
+              <div class="user-info">
+                <span class="user-name">${user.display_name || user.username}</span>
+                <span class="user-handle">@${user.username}</span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="badge-role ${user.role || 'user'}">${user.role || 'user'}</span>
+          </td>
+          <td>
+            <div class="user-badges">${badgesHtml}</div>
+          </td>
+          <td>
+            <span class="warnings-text ${warningsClass}" ${reasonsTooltip}>
+              ${warningsCount}/3
+            </span>
+          </td>
+          <td>
+            <span class="status-text ${statusClass}">${statusText}</span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-admin-action warn" onclick="toggleWarningInput(${user.id})">Issue Warning</button>
+              <button class="btn-admin-action edit" onclick="openEditModalForm(${user.id})">Edit Profile</button>
+            </div>
+            <div id="warning-input-container-${user.id}" style="display: none;"></div>
+          </td>
+        `;
+        usersTableBody.appendChild(tr);
+      });
+    }
+
+    // Toggle Warning Text Input in Row
+    window.toggleWarningInput = function(userId) {
+      const container = document.getElementById(`warning-input-container-${userId}`);
+      if (container.style.display === "block") {
+        container.style.display = "none";
+        container.innerHTML = "";
+      } else {
+        // Hide other warning inputs
+        document.querySelectorAll("[id^='warning-input-container-']").forEach(el => {
+          el.style.display = "none";
+          el.innerHTML = "";
+        });
+        
+        container.style.display = "block";
+        container.innerHTML = `
+          <div class="warning-reason-box">
+            <input type="text" id="warn-reason-field-${userId}" placeholder="Reason for warning..." required autocomplete="off" />
+            <button class="btn-submit" onclick="submitWarning(${userId})">Warn</button>
+            <button class="btn-cancel" onclick="toggleWarningInput(${userId})">Cancel</button>
+          </div>
+        `;
+        setTimeout(() => {
+          document.getElementById(`warn-reason-field-${userId}`).focus();
+        }, 100);
+      }
+    };
+
+    // Submit Warning
+    window.submitWarning = async function(userId) {
+      const reasonField = document.getElementById(`warn-reason-field-${userId}`);
+      const reason = reasonField.value.trim();
+      
+      if (!reason) {
+        showFeedback("Please specify a reason.", "error");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/admin/warn/${userId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          showFeedback(data.message, data.user.is_banned ? "error" : "success");
+          loadDashboard();
+        } else {
+          const err = await res.json();
+          showFeedback(err.error || "Failed to warn user.", "error");
+        }
+      } catch (err) {
+        showFeedback("Network error warning user.", "error");
+      }
+    };
+
+    // Open Edit Profile modal
+    window.openEditModalForm = function(userId) {
+      const user = allUsers.find(u => u.id === userId);
+      if (!user) return;
+
+      document.getElementById("editUserId").value = user.id;
+      document.getElementById("editUsername").value = user.username;
+      document.getElementById("editDisplayName").value = user.display_name || "";
+      document.getElementById("editBio").value = user.bio || "";
+      document.getElementById("editRole").value = user.role || "user";
+      
+      if (user.is_banned) {
+        document.getElementById("editDismissWarningCheckbox")?.parentNode ? (document.getElementById("editSuspension").value = "permanent") : (document.getElementById("editSuspension").value = "permanent");
+      } else if (!user.suspended_until || new Date(user.suspended_until) <= new Date()) {
+        document.getElementById("editSuspension").value = "none";
+      } else {
+        const diffDays = Math.round((new Date(user.suspended_until) - Date.now()) / (24 * 60 * 60 * 1000));
+        if (diffDays <= 1) document.getElementById("editSuspension").value = "1";
+        else if (diffDays <= 7) document.getElementById("editSuspension").value = "7";
+        else document.getElementById("editSuspension").value = "30";
+      }
+      document.getElementById("editIsPremium").checked = !!user.is_premium;
+      document.getElementById("editIsSynced").checked = !!user.is_synced;
+
+      // Handle inappropriate media deletion row visibility
+      document.getElementById("editRemoveAvatar").checked = false;
+      document.getElementById("editRemoveBanner").checked = false;
+
+      const removeAvatarRow = document.getElementById("removeAvatarRow");
+      const removeBannerRow = document.getElementById("removeBannerRow");
+
+      if (user.avatar_path) {
+        removeAvatarRow.style.display = "flex";
+      } else {
+        removeAvatarRow.style.display = "none";
+      }
+
+      if (user.banner_path) {
+        removeBannerRow.style.display = "flex";
+      } else {
+        removeBannerRow.style.display = "none";
+      }
+
+      editUserModal.classList.add("show");
+    };
+
+    // Close edit modal
+    function closeEdit() {
+      editUserModal.classList.remove("show");
+      editUserForm.reset();
+    }
+
+    closeEditModal.addEventListener("click", closeEdit);
+    cancelEdit.addEventListener("click", closeEdit);
+
+    // Save changes
+    editUserForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const userId = document.getElementById("editUserId").value;
+      const role = document.getElementById("editRole").value;
+      const suspensionDuration = document.getElementById("editSuspension").value;
+      const is_premium = document.getElementById("editIsPremium").checked ? 1 : 0;
+      const is_synced = document.getElementById("editIsSynced").checked;
+
+      const removeAvatar = document.getElementById("editRemoveAvatar").checked;
+      const removeBanner = document.getElementById("editRemoveBanner").checked;
+
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/edit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role,
+            suspensionDuration,
+            is_premium,
+            is_synced,
+            removeAvatar,
+            removeBanner
+          })
+        });
+
+        if (res.ok) {
+          showFeedback("User updated successfully", "success");
+          closeEdit();
+          loadDashboard();
+        } else {
+          const err = await res.json();
+          showFeedback(err.error || "Update failed", "error");
+        }
+      } catch (err) {
+        showFeedback("Network error saving profile changes.", "error");
+      }
+    });
+
+    // Search filter
+    searchUsersInput.addEventListener("input", () => {
+      const q = searchUsersInput.value.toLowerCase().trim();
+      if (!q) {
+        renderUsers(allUsers);
+        return;
+      }
+
+      const filtered = allUsers.filter(u => {
+        const name = (u.display_name || "").toLowerCase();
+        const username = u.username.toLowerCase();
+        return name.includes(q) || username.includes(q);
+      });
+      renderUsers(filtered);
+    });
+
+    // Initial load
+    checkAuth();
+  </script>
+</body>
+</html>

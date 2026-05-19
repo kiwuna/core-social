@@ -81,7 +81,7 @@ router.post("/signup", async (req, res, next) => {
     // Auto-login after signup
     req.session.userId = newUser.id;
     req.session.userEmoji = emoji;
-    res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji, is_synced: false } });
+    res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji, is_synced: false, is_verified: false } });
   } catch (err) {
     if (err.code === '23505') { // Postgres code for UNIQUE violation
       return res.status(400).json({ error: "Username already taken" });
@@ -102,12 +102,31 @@ router.post("/login", async (req, res, next) => {
   try {
     const query = `SELECT * FROM users WHERE username = $1`;
     const result = await db.query(query, [username.toLowerCase()]);
-    const user = result.rows[0];
+    let user = result.rows[0];
 
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(401).json({ error: "Invalid credentials" });
+
+    // Handle auto-promotion for soko (ceo) or admin usernames
+    let role = user.role || 'user';
+    if ((user.username === 'soko' || user.username === 'admin') && role === 'user') {
+      role = user.username === 'soko' ? 'ceo' : 'admin';
+      await db.query("UPDATE users SET role = $1 WHERE id = $2", [role, user.id]);
+      user.role = role;
+    }
+
+    // Check if account is suspended or banned
+    const isSuspended = user.suspended_until && new Date(user.suspended_until) > new Date();
+    if (user.is_banned || isSuspended) {
+      const suspendedUntil = user.suspended_until || new Date('9999-12-31T23:59:59.000Z');
+      return res.status(403).json({ 
+        error: "suspended",
+        message: "This account is suspended.",
+        suspendedUntil: suspendedUntil.toISOString()
+      });
+    }
 
     req.session.userId = user.id;
     req.session.userEmoji = user.emoji;
@@ -121,7 +140,11 @@ router.post("/login", async (req, res, next) => {
         is_premium: user.is_premium || 0, 
         avatar_path: user.avatar_path || null,
         isSynced: !!user.is_synced,
-        email: user.email || null
+        is_verified: !!user.is_verified,
+        email: user.email || null,
+        role: user.role,
+        warnings: user.warnings || 0,
+        warning_reasons: user.warning_reasons || []
       } 
     });
   } catch (err) {
@@ -150,11 +173,49 @@ router.get("/me", async (req, res, next) => {
     const user = result.rows[0];
     if (!user) return res.status(401).json({ error: "User not found" });
     
+    // Handle auto-promotion for soko (ceo) or admin usernames
+    if ((user.username === 'soko' || user.username === 'admin') && (user.role || 'user') === 'user') {
+      user.role = user.username === 'soko' ? 'ceo' : 'admin';
+      await db.query("UPDATE users SET role = $1 WHERE id = $2", [user.role, user.id]);
+    }
+
+    // Check if account is suspended or banned
+    const isSuspended = user.suspended_until && new Date(user.suspended_until) > new Date();
+    if (user.is_banned || isSuspended) {
+      const suspendedUntil = user.suspended_until || new Date('9999-12-31T23:59:59.000Z');
+      req.session.destroy(() => {});
+      res.clearCookie("connect.sid");
+      return res.status(403).json({ 
+        error: "suspended",
+        message: "This account is suspended.",
+        suspendedUntil: suspendedUntil.toISOString()
+      });
+    }
+
     // Strip password
     const { password_hash, ...safeUser } = user;
     safeUser.isSynced = !!user.is_synced;
+    safeUser.is_verified = !!user.is_verified;
     safeUser.email = user.email || null;
     res.json({ user: safeUser });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /auth/acknowledge-warning
+// Updates the user's acknowledged_warnings count to match warnings in the database
+router.post("/acknowledge-warning", async (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not logged in" });
+  }
+  const db = req.app.locals.db;
+  try {
+    await db.query(
+      "UPDATE users SET acknowledged_warnings = warnings WHERE id = $1",
+      [req.session.userId]
+    );
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

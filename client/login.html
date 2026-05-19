@@ -77,6 +77,13 @@
                     showFeedback('Welcome back.');
                     setTimeout(() => window.location.href = '/', 1000);
                 } else {
+                    if (data.error === 'suspended') {
+                        showFeedback('Account is suspended. Redirecting...', 'error');
+                        setTimeout(() => {
+                            window.location.href = `/suspended.html?until=${encodeURIComponent(data.suspendedUntil)}`;
+                        }, 1000);
+                        return;
+                    }
                     showFeedback(data.error || 'Login failed', 'error');
                     inputs.forEach(i => i.classList.add('error-state'));
                 }

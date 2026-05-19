@@ -22,43 +22,7 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
   }
 
   try {
-    // Check if email is already synced to another account
-    const emailCheck = await db.query("SELECT id FROM users WHERE email = $1 AND id != $2", [email.toLowerCase(), userId]);
-    if (emailCheck.rows.length > 0) {
-      return res.status(400).json({ 
-        type: 'gmail',
-        error: "This email is already connected to another account." 
-      });
-    }
-
-    /*
-    // Cooldown check: 60 seconds (60,000ms) raw Unix time
-    const userResult = await db.query("SELECT last_sync_request FROM users WHERE id = $1", [userId]);
-    const lastRequest = userResult.rows[0].last_sync_request; 
-    
-    if (lastRequest && (Date.now() - Number(lastRequest) < 60000)) {
-      const remaining = Math.ceil((60000 - (Date.now() - Number(lastRequest))) / 1000);
-      return res.status(429).json({ 
-        type: 'cooldown',
-        error: `Please wait ${remaining} seconds before requesting a new code.` 
-      });
-    }
-    */
-
     const code = generateCode();
-
-    // Bypass for testing: Auto-verify specific email
-    if (email.toLowerCase() === 'marinkawii@gmail.com') {
-      await db.query(
-        "UPDATE users SET email = $1, is_synced = TRUE, sync_code = NULL, last_sync_request = $2 WHERE id = $3",
-        [email.toLowerCase(), Date.now(), userId]
-      );
-      return res.json({ 
-        message: "Developer Bypass: Email auto-verified!", 
-        isSynced: true,
-        bypassed: true 
-      });
-    }
 
     // Save code and timestamp to user (BIGINT raw milliseconds)
     await db.query(
@@ -67,16 +31,20 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
     );
 
     // Send the CORE themed email
-    await sendVerificationEmail(email, code);
+    const mailInfo = await sendVerificationEmail(email, code);
+
+    // If SMTP returns null because of a mailer failure, do not throw 500.
+    // Instead, log it and let the user view the verification page anyway.
+    if (mailInfo === null) {
+      console.warn(`⚠️ [SMTP ERROR BYPASS] Failed to dispatch code "${code}" to ${email} via SMTP. Bypassing safely to allow manual admin override.`);
+      return res.json({ 
+        message: "Verification code requested. (SMTP bypassed due to connection limits)", 
+        smtp_failed: true 
+      });
+    }
 
     res.json({ message: "Verification code sent to " + email });
   } catch (err) {
-    if (err.code === '23505') {
-      return res.status(400).json({ 
-        type: 'gmail',
-        error: "This email is already connected to another account." 
-      });
-    }
     console.error("Sync request error stack:", err.stack);
     res.status(500).json({ error: "Failed to send verification code. Please check your email configuration." });
   }
@@ -106,9 +74,9 @@ router.post("/sync-verify", isAuthenticated, async (req, res, next) => {
       return res.status(400).json({ error: "Invalid or expired verification code." });
     }
 
-    // Success: Mark as synced and clear code
+    // Success: Mark as synced & verified and clear code
     await db.query(
-      "UPDATE users SET is_synced = TRUE, sync_code = NULL WHERE id = $1",
+      "UPDATE users SET is_synced = TRUE, is_verified = TRUE, sync_code = NULL WHERE id = $1",
       [userId]
     );
 

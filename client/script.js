@@ -317,6 +317,13 @@ function updateAuthUI() {
       }
     }
 
+    // Admin Panel Link Visibility
+    const navAdmin = document.getElementById("navAdmin");
+    if (navAdmin) {
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'ceo' || currentUser.role === 'mod' || currentUser.username === 'ceo' || currentUser.username === 'admin';
+      navAdmin.classList.toggle("hidden", !isAdmin);
+    }
+
     logoutBtn.classList.remove("hidden");
     loginLink.classList.add("hidden");
   } else {
@@ -340,9 +347,14 @@ function updateAuthUI() {
       navCoreFlow.style.color = '';
       navCoreFlow.querySelector('span:last-child').textContent = 'CORE FLOW';
     }
+    const navAdmin = document.getElementById("navAdmin");
+    if (navAdmin) navAdmin.classList.add("hidden");
     
     logoutBtn.classList.add("hidden");
     loginLink.classList.remove("hidden");
+  }
+  if (typeof checkSyncLock === 'function') {
+    checkSyncLock();
   }
 }
 
@@ -352,13 +364,59 @@ async function fetchCurrentUser() {
     if (res.ok) {
       const data = await res.json();
       currentUser = data.user;
+      updateAuthUI();
+      checkUserWarnings();
+    } else if (res.status === 403) {
+      const data = await res.json();
+      if (data.error === "suspended") {
+        window.location.href = `/suspended.html?until=${encodeURIComponent(data.suspendedUntil)}`;
+        return;
+      }
+      currentUser = null;
+      updateAuthUI();
     } else {
       currentUser = null;
+      updateAuthUI();
     }
-    updateAuthUI();
   } catch (err) {
     currentUser = null;
     updateAuthUI();
+  }
+}
+
+function showWarningModalDirectly() {
+  if (!currentUser) return;
+  const warningModal = document.getElementById("warningModal");
+  const warningModalTitle = document.getElementById("warningModalTitle");
+  const warningModalMessage = document.getElementById("warningModalMessage");
+  const warningModalClose = document.getElementById("warningModalClose");
+
+  if (warningModal && warningModalTitle && warningModalMessage) {
+    warningModalTitle.textContent = `Warning ${currentUser.warnings}/3`;
+    
+    const reasons = currentUser.warning_reasons || [];
+    const latestReason = reasons.length > 0 ? reasons[reasons.length - 1] : "No reason provided.";
+    warningModalMessage.textContent = latestReason;
+    
+    warningModal.classList.add("show");
+    
+    if (warningModalClose) {
+      warningModalClose.onclick = async () => {
+        warningModal.classList.remove("show");
+        try {
+          await fetch("/auth/acknowledge-warning", { method: "POST" });
+          currentUser.acknowledged_warnings = currentUser.warnings;
+        } catch (err) {
+          console.error("Failed to acknowledge warning:", err);
+        }
+      };
+    }
+  }
+}
+
+function checkUserWarnings() {
+  if (currentUser && currentUser.warnings > (currentUser.acknowledged_warnings || 0)) {
+    showWarningModalDirectly();
   }
 }
 
@@ -816,23 +874,33 @@ async function showNotifications() {
       
       let text = "";
       let icon = "";
+      let isSystem = false;
+
       if (n.type === 'like') { text = "liked your post"; icon = "❤️"; }
       else if (n.type === 'follow') { text = "started following you"; icon = "👤"; }
       else if (n.type === 'comment') { text = "commented on your post"; icon = "💬"; }
+      else if (n.type === 'warning') { 
+        text = "You received a warning"; 
+        icon = "⚠️";
+        isSystem = true;
+      }
 
       el.innerHTML = `
-        <div class="mini-avatar" style="width: 44px; height: 44px;">
-          ${n.sender_avatar ? `<img src="${n.sender_avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : (n.sender_emoji || "👤")}
+        <div class="mini-avatar" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: ${isSystem ? 'rgba(217, 119, 6, 0.08)' : 'transparent'}; border: ${isSystem ? '1px solid rgba(217, 119, 6, 0.15)' : '0'}; border-radius: 50%;">
+          ${isSystem 
+            ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>` 
+            : (n.sender_avatar ? `<img src="${n.sender_avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : (n.sender_emoji || "👤"))
+          }
         </div>
         <div style="flex: 1;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <span style="font-weight: 800; color: #fff;">${n.sender_display_name || n.sender_username}</span>
-            <span style="font-size: 13px; color: var(--muted);">${text}</span>
+            <span style="font-weight: 800; color: #fff;">${isSystem ? "System" : (n.sender_display_name || n.sender_username)}</span>
+            <span style="font-size: 13px; color: ${isSystem ? '#d97706' : 'var(--muted)'}; font-weight: ${isSystem ? '500' : '400'};">${text}</span>
           </div>
           ${n.post_content ? `<p style="font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.8;">${n.post_content}</p>` : ""}
           <span style="font-size: 11px; color: var(--muted); opacity: 0.5; margin-top: 4px; display: block;">${timeAgo(new Date(n.created_at))}</span>
         </div>
-        <div style="font-size: 18px; opacity: 0.6;">${icon}</div>
+        <div style="font-size: 18px; opacity: 0.6;">${isSystem ? "" : icon}</div>
         <div class="notification-swipe-action" onclick="deleteNotification('${n.id}', this.parentElement)">Delete</div>
       `;
       
@@ -861,7 +929,9 @@ async function showNotifications() {
 
       el.onclick = (e) => {
         if (e.target.classList.contains('notification-swipe-action')) return;
-        if (n.post_id) {
+        if (n.type === 'warning') {
+          showWarningModalDirectly();
+        } else if (n.post_id) {
           MapsTo('post/' + n.post_id);
         } else {
           MapsTo('profile/' + n.sender_id);
@@ -2161,6 +2231,139 @@ async function handleFollow(userId, button) {
   } finally {
     button.disabled = false;
   }
+}
+
+// ═══════════════════════════════════════
+// Global Email Sync Lock Overlay Logic
+// ═══════════════════════════════════════
+
+window.checkSyncLock = function() {
+  const overlay = document.getElementById("syncLockOverlay");
+  if (!overlay) return;
+  if (currentUser) {
+    const isSynced = !!(currentUser.isSynced || currentUser.is_synced || currentUser.is_verified);
+    if (!isSynced) {
+      overlay.style.display = "flex";
+      // Ensure other modals are closed
+      if (settingsModal) settingsModal.classList.remove("show");
+    } else {
+      overlay.style.display = "none";
+    }
+  } else {
+    overlay.style.display = "none";
+  }
+};
+
+const btnLockSendCode = document.getElementById("btnLockSendCode");
+const lockSyncEmailInput = document.getElementById("lockSyncEmailInput");
+const btnLockVerify = document.getElementById("btnLockVerify");
+const lockSyncCodeInput = document.getElementById("lockSyncCodeInput");
+const btnLockCancel = document.getElementById("btnLockCancel");
+const lockSyncLogoutBtn = document.getElementById("lockSyncLogoutBtn");
+
+const lockRequestForm = document.getElementById("lockRequestForm");
+const lockVerifyForm = document.getElementById("lockVerifyForm");
+const lockSyncEmailAddress = document.getElementById("lockSyncEmailAddress");
+
+if (btnLockSendCode) {
+  btnLockSendCode.addEventListener("click", async () => {
+    const email = lockSyncEmailInput.value.trim();
+    if (!email || !email.includes("@")) {
+      showFeedback("Please enter a valid email address.", "error");
+      return;
+    }
+
+    btnLockSendCode.disabled = true;
+    btnLockSendCode.textContent = "...";
+
+    try {
+      const res = await fetch("/api/sync-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isSynced) {
+          currentUser.isSynced = true;
+          currentUser.is_verified = true;
+          currentUser.email = email;
+          updateAuthUI();
+          showFeedback(data.message || "Email verified!", "success");
+          return;
+        }
+        lockSyncEmailAddress.textContent = email;
+        lockRequestForm.style.display = "none";
+        lockVerifyForm.style.display = "block";
+        showFeedback(data.message || "Verification code requested!", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Failed to send code.", "error");
+      }
+    } catch (err) {
+      showFeedback("Error connecting to server.", "error");
+    } finally {
+      btnLockSendCode.disabled = false;
+      btnLockSendCode.textContent = "Send Verification Code";
+    }
+  });
+}
+
+if (btnLockVerify) {
+  btnLockVerify.addEventListener("click", async () => {
+    const email = lockSyncEmailAddress.textContent;
+    const code = lockSyncCodeInput.value.trim();
+
+    if (code.length !== 6) {
+      showFeedback("Please enter the 6-digit code.", "error");
+      return;
+    }
+
+    btnLockVerify.disabled = true;
+    btnLockVerify.textContent = "...";
+
+    try {
+      const res = await fetch("/api/sync-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        currentUser.isSynced = true;
+        currentUser.is_verified = true;
+        currentUser.email = email;
+        
+        updateAuthUI();
+        showFeedback("Email synced & Verified!", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Verification failed.", "error");
+      }
+    } catch (err) {
+      showFeedback("Error connecting to server.", "error");
+    } finally {
+      btnLockVerify.disabled = false;
+      btnLockVerify.textContent = "Verify Code";
+    }
+  });
+}
+
+if (btnLockCancel) {
+  btnLockCancel.addEventListener("click", () => {
+    lockVerifyForm.style.display = "none";
+    lockRequestForm.style.display = "block";
+    lockSyncCodeInput.value = "";
+  });
+}
+
+if (lockSyncLogoutBtn) {
+  lockSyncLogoutBtn.addEventListener("click", async () => {
+    const res = await fetch("/auth/logout", { method: "POST" });
+    if (res.ok) window.location.reload();
+  });
 }
 
 (async function init() {

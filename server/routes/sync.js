@@ -30,23 +30,19 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
       [email.toLowerCase(), code, Date.now(), userId]
     );
 
-    // Send the CORE themed email
-    const mailInfo = await sendVerificationEmail(email, code);
+    // Dispatch the CORE themed email in the background without awaiting it!
+    sendVerificationEmail(email, code).catch(err => {
+      console.error(`❌ Background SMTP Dispatch failed for ${email}:`, err.message);
+    });
 
-    // If SMTP returns null because of a mailer failure, do not throw 500.
-    // Instead, log it and let the user view the verification page anyway.
-    if (mailInfo === null) {
-      console.warn(`⚠️ [SMTP ERROR BYPASS] Failed to dispatch code "${code}" to ${email} via SMTP. Bypassing safely to allow manual admin override.`);
-      return res.json({ 
-        message: "Verification code requested. (SMTP bypassed due to connection limits)", 
-        smtp_failed: true 
-      });
-    }
-
-    res.json({ message: "Verification code sent to " + email });
+    // Instantly return success to frontend in under 1 second!
+    return res.status(200).json({ 
+      success: true, 
+      message: "Verification code requested!" 
+    });
   } catch (err) {
     console.error("Sync request error stack:", err.stack);
-    res.status(500).json({ error: "Failed to send verification code. Please check your email configuration." });
+    res.status(500).json({ error: "Failed to generate sync code. Please check database configuration." });
   }
 });
 

@@ -132,13 +132,12 @@ router.post("/unlink-request", isAuthenticated, async (req, res, next) => {
       [code, userId]
     );
 
-    // Send the CORE themed verification email asynchronously in the background
+    // FIXED: switched to sendUnlinkEmail and added await so the request doesn't complete until the mailer resolves 💀🔥
     try {
-      sendVerificationEmail(user.email, code).catch(error => {
-        console.error('Unlink mailer error:', error);
-      });
+      await sendUnlinkEmail(user.email, code);
+      console.log(`📬 Unlink code sent successfully to ${user.email}`);
     } catch (error) {
-      console.error('Unlink mailer error:', error);
+      console.error('❌ SMTP Unlink mailer error:', error.message);
     }
 
     return res.status(200).json({ 

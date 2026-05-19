@@ -17,6 +17,10 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
   const db = req.app.locals.db;
   const userId = req.session.userId;
 
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
   try {
     // 1. Fetch current user from database to check for an existing email
     const dbResult = await db.query(

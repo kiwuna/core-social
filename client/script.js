@@ -158,7 +158,7 @@ const activateCoreFlowModal = document.getElementById("activateCoreFlowModal");
 // Sync Email Elements
 const emailSyncStatus = document.getElementById("emailSyncStatus");
 const syncEmailForm = document.getElementById("syncEmailForm");
-const syncEmailInput = document.getElementById("syncEmailInput");
+const syncEmailInput = document.getElementById("email") || document.getElementById("syncEmailInput");
 const btnRequestSync = document.getElementById("btnRequestSync");
 const verifySyncForm = document.getElementById("verifySyncForm");
 const syncEmailAddress = document.getElementById("syncEmailAddress");

@@ -8,7 +8,7 @@ const transporter = nodemailer.createTransport({
   secure: true,
   auth: {
     user: "resend",
-    pass: process.env.EMAIL_PASS // We will put your Resend API Key here
+    pass: process.env.EMAIL_PASS // Your Resend API Key (re_...)
   }
 });
 
@@ -17,7 +17,8 @@ const transporter = nodemailer.createTransport({
  */
 async function sendEmail(to, subject, html) {
   const mailOptions = {
-    from: `"CORE" <${process.env.EMAIL_USER}>`, // Make sure this is verified in Resend later
+    // FIXED: Must be exactly like this for the Resend free tier/unverified domains
+    from: "onboarding@resend.dev", 
     to: to,
     subject: subject,
     html: html

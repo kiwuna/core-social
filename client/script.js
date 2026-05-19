@@ -2116,8 +2116,10 @@ if (activateCoreFlowModal) {
 
 if (btnRequestSync) {
   btnRequestSync.addEventListener("click", async () => {
-    const email = syncEmailInput.value.trim();
-    if (!email || !email.includes("@")) {
+    const emailInputEl = document.getElementById("email") || document.getElementById("syncEmailInput");
+    const emailValue = emailInputEl ? emailInputEl.value.trim() : "";
+    
+    if (!emailValue || !emailValue.includes("@")) {
       showFeedback("Please enter a valid email address.", "error");
       return;
     }
@@ -2129,7 +2131,7 @@ if (btnRequestSync) {
       const res = await fetch("/api/sync-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: emailValue })
       });
 
       if (res.ok) {
@@ -2376,9 +2378,10 @@ const lockSyncEmailAddress = document.getElementById("lockSyncEmailAddress");
 if (btnLockSendCode) {
   btnLockSendCode.addEventListener("click", async (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    const emailField = document.getElementById("lockSyncEmailInput") || document.getElementById("email");
-    const email = emailField ? emailField.value.trim() : "";
-    if (!email || !email.includes("@")) {
+    const emailInputEl = document.getElementById("lockSyncEmailInput");
+    const emailValue = emailInputEl ? emailInputEl.value.trim() : "";
+    
+    if (!emailValue || !emailValue.includes("@")) {
       showFeedback("Please enter a valid email address.", "error");
       return;
     }
@@ -2390,7 +2393,7 @@ if (btnLockSendCode) {
       const res = await fetch("/api/sync-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: emailValue })
       });
 
       if (res.ok) {

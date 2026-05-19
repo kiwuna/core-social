@@ -92,6 +92,12 @@
             const password = document.getElementById('password').value;
             const emoji = emojiInput.value;
 
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '...';
+            }
+
             try {
                 const res = await fetch('/auth/signup', {
                     method: 'POST',
@@ -110,9 +116,17 @@
                     } else {
                         inputs.forEach(i => i.classList.add('error-state'));
                     }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Begin Journey';
+                    }
                 }
             } catch (err) {
                 showFeedback('Connection error: Is server running?', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Begin Journey';
+                }
             }
         });
     </script>

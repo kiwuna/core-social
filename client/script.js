@@ -2267,7 +2267,8 @@ const lockVerifyForm = document.getElementById("lockVerifyForm");
 const lockSyncEmailAddress = document.getElementById("lockSyncEmailAddress");
 
 if (btnLockSendCode) {
-  btnLockSendCode.addEventListener("click", async () => {
+  btnLockSendCode.addEventListener("click", async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     const email = lockSyncEmailInput.value.trim();
     if (!email || !email.includes("@")) {
       showFeedback("Please enter a valid email address.", "error");

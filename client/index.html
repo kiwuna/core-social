@@ -377,8 +377,21 @@
                   <div style="font-size: 12px; color: #a78bfa;">Synced & Verified Account</div>
                 </div>
               </div>
-              <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(124, 58, 237, 0.2); font-size: 12px; opacity: 0.8; line-height: 1.4;">
-                Your account is now synced. Premium features and the verified badge are active.
+              <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(124, 58, 237, 0.2); font-size: 12px; opacity: 0.8; line-height: 1.4; display: flex; flex-direction: column; gap: 12px;">
+                <div>Your account is now synced. Premium features and the verified badge are active.</div>
+                <button id="btnUnlinkRequest" class="btn-pill" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 16px; font-size: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; text-align: center; transition: all 0.2s;">Unlink Account Email</button>
+              </div>
+            </div>
+
+            <div id="verifyUnlinkForm" class="hidden" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--panel-border);">
+              <div class="settings-label" style="color: #ef4444;">Confirm Unlink Email</div>
+              <div class="settings-hint" style="margin-bottom: 12px;">We've sent a 6-digit confirmation code to your synced email. Enter it below to proceed with unlinking.</div>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="unlinkCodeInput" class="settings-input" placeholder="000000" maxlength="6" style="margin: 0; text-align: center; letter-spacing: 4px; font-weight: 800; font-size: 20px;" />
+                <button id="btnUnlinkVerify" class="btn-pill" style="white-space: nowrap; background: #ef4444; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;">Verify & Unlink</button>
+              </div>
+              <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <button id="btnUnlinkCancel" class="btn-text" style="font-size: 12px; opacity: 0.5; background: none; border: none; color: #fff; cursor: pointer; padding: 0;">Cancel</button>
               </div>
             </div>
           </div>

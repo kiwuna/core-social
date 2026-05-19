@@ -168,6 +168,13 @@ const btnCancelSync = document.getElementById("btnCancelSync");
 const syncedEmailInfo = document.getElementById("syncedEmailInfo");
 const syncedEmailDisplay = document.getElementById("syncedEmailDisplay");
 
+// Unlink Email Elements
+const btnUnlinkRequest = document.getElementById("btnUnlinkRequest");
+const verifyUnlinkForm = document.getElementById("verifyUnlinkForm");
+const unlinkCodeInput = document.getElementById("unlinkCodeInput");
+const btnUnlinkVerify = document.getElementById("btnUnlinkVerify");
+const btnUnlinkCancel = document.getElementById("btnUnlinkCancel");
+
 // Mobile Elements
 const mobileMenuBtn = document.getElementById("mobileMenuBtn");
 const mobNavFeed = document.getElementById("mobNavFeed");
@@ -1678,6 +1685,14 @@ function openSettings(tab = "account", push = true) {
     verifySyncForm.classList.add("hidden");
     syncedEmailInfo.classList.remove("hidden");
     syncedEmailDisplay.textContent = currentUser.email || "Verified Email";
+
+    // Reset Unlink Form
+    if (verifyUnlinkForm) verifyUnlinkForm.classList.add("hidden");
+    if (btnUnlinkRequest) {
+      btnUnlinkRequest.style.display = "block";
+      btnUnlinkRequest.disabled = false;
+      btnUnlinkRequest.textContent = "Unlink Account Email";
+    }
   } else {
     emailSyncStatus.classList.add("unverified");
     emailSyncStatus.classList.remove("synced");
@@ -1686,6 +1701,9 @@ function openSettings(tab = "account", push = true) {
     syncEmailForm.classList.remove("hidden");
     verifySyncForm.classList.add("hidden");
     syncedEmailInfo.classList.add("hidden");
+
+    // Hide Unlink Form
+    if (verifyUnlinkForm) verifyUnlinkForm.classList.add("hidden");
   }
 
   switchSettingsTab(tab);
@@ -2189,6 +2207,95 @@ if (btnCancelSync) {
     verifySyncForm.classList.add("hidden");
     syncEmailForm.classList.remove("hidden");
     syncCodeInput.value = "";
+  });
+}
+
+if (btnUnlinkRequest) {
+  btnUnlinkRequest.addEventListener("click", async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    btnUnlinkRequest.disabled = true;
+    btnUnlinkRequest.textContent = "...";
+
+    try {
+      const res = await fetch("/api/unlink-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        btnUnlinkRequest.style.display = "none";
+        verifyUnlinkForm.classList.remove("hidden");
+        showFeedback(data.message || "Verification code sent!", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Failed to initiate unlink.", "error");
+        btnUnlinkRequest.disabled = false;
+        btnUnlinkRequest.textContent = "Unlink Account Email";
+      }
+    } catch (err) {
+      showFeedback("Error connecting to server.", "error");
+      btnUnlinkRequest.disabled = false;
+      btnUnlinkRequest.textContent = "Unlink Account Email";
+    }
+  });
+}
+
+if (btnUnlinkVerify) {
+  btnUnlinkVerify.addEventListener("click", async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const code = unlinkCodeInput.value.trim();
+    if (code.length !== 6) {
+      showFeedback("Please enter the 6-digit code.", "error");
+      return;
+    }
+
+    btnUnlinkVerify.disabled = true;
+    btnUnlinkVerify.textContent = "...";
+
+    try {
+      const res = await fetch("/api/unlink-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        currentUser.isSynced = false;
+        currentUser.is_verified = false;
+        currentUser.email = null;
+
+        verifyUnlinkForm.classList.add("hidden");
+        btnUnlinkRequest.style.display = "block";
+        btnUnlinkRequest.disabled = false;
+        btnUnlinkRequest.textContent = "Unlink Account Email";
+        unlinkCodeInput.value = "";
+
+        updateAuthUI();
+        openSettings('security', false);
+        showFeedback("Email successfully unlinked!", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Unlink verification failed.", "error");
+      }
+    } catch (err) {
+      showFeedback("Error connecting to server.", "error");
+    } finally {
+      btnUnlinkVerify.disabled = false;
+      btnUnlinkVerify.textContent = "Verify & Unlink";
+    }
+  });
+}
+
+if (btnUnlinkCancel) {
+  btnUnlinkCancel.addEventListener("click", (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    verifyUnlinkForm.classList.add("hidden");
+    btnUnlinkRequest.style.display = "block";
+    btnUnlinkRequest.disabled = false;
+    btnUnlinkRequest.textContent = "Unlink Account Email";
+    unlinkCodeInput.value = "";
   });
 }
 

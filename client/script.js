@@ -445,9 +445,8 @@ function createPostElement(post) {
     ? `<img src="${post.avatar_path.startsWith('http') ? post.avatar_path : API_URL + post.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`
     : (post.emoji || "👻");
 
-  // Verified badge (Restored blue icon for synced users)
-  const isSynced = post.isSynced || post.is_synced;
-  const verifiedBadge = isSynced ? `<span class="verified-check" title="Verified User"></span>` : "";
+  // Verified badge only for Core Flow users
+  const verifiedBadge = isPremiumPost ? `<span class="verified-check" title="Core Flow"></span>` : "";
 
   postElement.innerHTML = `
     <div class="post-head">
@@ -758,8 +757,7 @@ async function showProfile(userId) {
       <div class="profile-info">
         <h2 style="display:flex;align-items:center;gap:8px;">
           <span class="${userData.is_premium ? 'premium-name-gradient' : ''}">${userData.display_name || userData.username}</span>
-          ${(userData.isSynced || userData.is_synced) ? `<span class="verified-check" title="Verified Account"></span>` : ''}
-          ${userData.is_premium ? `<span class="premium-check" title="Core Flow" style="width:22px;height:22px; display:inline-block; background: url('./assets/star.png'); background-size: contain;"></span>` : ''}
+          ${userData.is_premium ? `<span class="verified-check" title="Core Flow"></span><span class="premium-check" title="Core Flow" style="width:22px;height:22px; display:inline-block; background: url('./assets/star.png'); background-size: contain;"></span>` : ''}
         </h2>
         <p class="handle">@${userData.username.toLowerCase()}</p>
         

@@ -73,14 +73,14 @@ router.post("/signup", async (req, res, next) => {
     const hash = await bcrypt.hash(password, saltRounds);
 
     // PostgreSQL uses $1, $2, $3 for placeholders and RETURNING to get the ID
-    const query = `INSERT INTO users (username, password_hash, emoji) VALUES ($1, $2, $3) RETURNING id`;
+    const query = `INSERT INTO users (username, password_hash, emoji, is_synced, is_verified) VALUES ($1, $2, $3, TRUE, TRUE) RETURNING id`;
     const result = await db.query(query, [username.toLowerCase(), hash, emoji]);
     const newUser = result.rows[0];
 
     // Auto-login after signup
     req.session.userId = newUser.id;
     req.session.userEmoji = emoji;
-    res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji, is_synced: false, is_verified: false } });
+    res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji, is_synced: true, is_verified: true } });
   } catch (err) {
     if (err.code === '23505') { // Postgres code for UNIQUE violation
       return res.status(400).json({ error: "Username already taken" });

@@ -2420,12 +2420,12 @@ if (btnLockSendCode) {
         if (data.isSynced) {
           currentUser.isSynced = true;
           currentUser.is_verified = true;
-          currentUser.email = email;
+          currentUser.email = emailValue;
           updateAuthUI();
           showFeedback(data.message || "Email verified!", "success");
           return;
         }
-        lockSyncEmailAddress.textContent = email;
+        lockSyncEmailAddress.textContent = emailValue;
         lockRequestForm.style.display = "none";
         lockVerifyForm.style.display = "block";
         showFeedback(data.message || "Verification code requested!", "success");
@@ -2466,7 +2466,7 @@ if (btnLockVerify) {
         const data = await res.json();
         currentUser.isSynced = true;
         currentUser.is_verified = true;
-        currentUser.email = email;
+        currentUser.email = lockSyncEmailAddress.textContent;
         
         updateAuthUI();
         showFeedback("Email synced & Verified!", "success");

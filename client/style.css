@@ -2248,8 +2248,8 @@ body {
     display: flex;
     touch-action: manipulation;
     bottom: 0;
-    height: calc(64px + var(--safe-bottom));
-    padding-bottom: var(--safe-bottom);
+    height: 64px;
+    padding-bottom: 0;
   }
 
   body.sidebar-open .mobile-nav,

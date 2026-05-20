@@ -134,6 +134,7 @@ const loginLink = document.getElementById("loginLink");
 
 let isPosting = false;
 let currentUser = null;
+const PUSH_USER_KEY = "core_push_user_id";
 const pendingPostActions = new Set();
 let selectedImageFile = null;
 let selectedImagePreviewUrl = "";
@@ -414,6 +415,13 @@ async function subscribeToPush() {
     throw new Error("Notification permission was denied.");
   }
 
+  if (currentUser?.id) {
+    const activePushUser = localStorage.getItem(PUSH_USER_KEY);
+    if (activePushUser && activePushUser !== String(currentUser.id)) {
+      await unsubscribeFromPush();
+    }
+  }
+
   const keyRes = await fetch("/api/push/public-key", { credentials: "include" });
   if (!keyRes.ok) throw new Error("Missing push public key.");
   const { publicKey } = await keyRes.json();
@@ -438,7 +446,26 @@ async function subscribeToPush() {
     body: JSON.stringify(subscription)
   });
 
+  if (currentUser?.id) {
+    localStorage.setItem(PUSH_USER_KEY, String(currentUser.id));
+  }
+
   return subscription;
+}
+
+async function unsubscribeFromPush() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription) {
+      await subscription.unsubscribe();
+    }
+  } catch (error) {
+    console.warn("Push unsubscribe skipped:", error.message);
+  } finally {
+    localStorage.removeItem(PUSH_USER_KEY);
+  }
 }
 
 async function setupPushNotifications() {
@@ -1511,6 +1538,7 @@ if (addPollOptionButton) {
 }
 
 logoutBtn.addEventListener("click", async () => {
+  await unsubscribeFromPush();
   const res = await fetch("/auth/logout", { method: "POST" });
   if (res.ok) window.location.reload();
 });

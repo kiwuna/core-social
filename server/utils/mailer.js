@@ -54,10 +54,20 @@ async function sendEmail(to, subject, html) {
     console.log("Email sent successfully via Gmail SMTP:", info.messageId);
     return info;
   } catch (error) {
-    console.error("Email send error:", error.message);
+    const detailParts = [error.message];
     if (error.code) console.error("Email send code:", error.code);
-    if (error.response) console.error("Email send response:", error.response);
-    if (error.responseCode) console.error("Email send response code:", error.responseCode);
+    if (error.response) {
+      console.error("Email send response:", error.response);
+      detailParts.push(String(error.response));
+    }
+    if (error.responseCode) {
+      console.error("Email send response code:", error.responseCode);
+      detailParts.push(`code=${error.responseCode}`);
+    }
+    if (error.code) {
+      detailParts.push(`error=${error.code}`);
+    }
+    console.error("Email send error:", detailParts.join(" | "));
     throw error;
   }
 }

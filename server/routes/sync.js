@@ -101,7 +101,9 @@ router.post("/sync-request", isAuthenticated, async (req, res, next) => {
       await db.query("UPDATE users SET sync_code = NULL WHERE id = $1", [userId]);
       
       return res.status(500).json({ 
-        error: "Failed to send verification email. Please check your email address and try again." 
+        error: emailError && emailError.message
+          ? emailError.message
+          : "Failed to send verification email. Please check your email address and try again."
       });
     }
 
@@ -266,7 +268,9 @@ router.post("/unlink-request", isAuthenticated, async (req, res, next) => {
       await db.query("UPDATE users SET sync_code = NULL WHERE id = $1", [userId]);
       
       return res.status(500).json({ 
-        error: "Failed to send unlink email. Please try again." 
+        error: emailError && emailError.message
+          ? emailError.message
+          : "Failed to send unlink email. Please try again."
       });
     }
 

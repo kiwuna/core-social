@@ -160,6 +160,17 @@ const initDb = async () => {
       )
     `);
 
+    // Messages table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Notifications table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS notifications (

@@ -196,10 +196,7 @@ const confirmCancel = document.getElementById("confirmCancel");
 const confirmProceed = document.getElementById("confirmProceed");
 const checkoutForm = document.querySelector('form[action="/create-checkout-session"]');
 
-// Create Sidebar Overlay
-const sidebarOverlay = document.createElement("div");
-sidebarOverlay.className = "sidebar-overlay";
-document.body.appendChild(sidebarOverlay);
+const sidebarOverlay = document.getElementById("sidebarOverlay");
 
 function showFeedback(message, type = "info") {
   if (!feedbackMessage) return;
@@ -480,20 +477,43 @@ async function setupPushNotifications() {
   }
 }
 
+const KEYBOARD_OPEN_THRESHOLD = 24;
+
 function updateKeyboardViewport() {
   const vv = window.visualViewport;
-  if (!vv) return;
+  if (!vv) {
+    document.documentElement.style.setProperty("--vv-height", "100dvh");
+    document.documentElement.style.setProperty("--vv-offset-top", "0px");
+    document.documentElement.style.setProperty("--keyboard-offset", "0px");
+    return;
+  }
 
-  const keyboardOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-  document.documentElement.style.setProperty("--keyboard-offset", `${keyboardOffset}px`);
+  const offsetTop = Math.max(0, vv.offsetTop);
+  const keyboardInset = Math.max(0, window.innerHeight - vv.height - offsetTop);
+  const keyboardOpen = keyboardInset > KEYBOARD_OPEN_THRESHOLD;
+
+  document.documentElement.style.setProperty("--vv-height", `${vv.height}px`);
+  document.documentElement.style.setProperty("--vv-offset-top", `${offsetTop}px`);
+  document.documentElement.style.setProperty("--keyboard-offset", `${keyboardInset}px`);
+
+  document.documentElement.classList.toggle("keyboard-open", keyboardOpen);
+  document.body.classList.toggle("keyboard-open", keyboardOpen);
 
   const chatShell = document.querySelector(".chat-shell");
   if (chatShell) {
-    chatShell.classList.toggle("keyboard-open", keyboardOffset > 0);
+    chatShell.classList.toggle("keyboard-open", keyboardOpen);
+  }
+
+  if (keyboardOpen) {
+    window.scrollTo(0, 0);
   }
 }
 
 function initKeyboardViewportFix() {
+  if (navigator.virtualKeyboard) {
+    navigator.virtualKeyboard.overlaysContent = true;
+  }
+
   updateKeyboardViewport();
 
   if (window.visualViewport) {
@@ -504,7 +524,21 @@ function initKeyboardViewportFix() {
   window.addEventListener("resize", updateKeyboardViewport);
   window.addEventListener("orientationchange", () => {
     setTimeout(updateKeyboardViewport, 50);
+    setTimeout(updateKeyboardViewport, 300);
   });
+
+  const chatInput = document.getElementById("chatInput");
+  if (chatInput) {
+    chatInput.addEventListener("focus", () => {
+      setTimeout(updateKeyboardViewport, 50);
+      setTimeout(updateKeyboardViewport, 300);
+      scrollToBottom();
+    });
+    chatInput.addEventListener("blur", () => {
+      setTimeout(updateKeyboardViewport, 50);
+      setTimeout(updateKeyboardViewport, 300);
+    });
+  }
 }
 
 function showWarningModalDirectly() {
@@ -722,21 +756,17 @@ async function loadFeed() {
       const emptyMsg = feedMode === "following" 
         ? "Follow users to personalize your feed." 
         : "No posts yet. Be the first!";
-      postsList.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--muted);">${emptyMsg}</div>`;
+      postsList.innerHTML = `<div class="feed-empty-state">${emptyMsg}</div>`;
       return;
     }
 
     posts.forEach((post, index) => {
       const el = createPostElement(post);
-      el.style.opacity = "0";
-      el.style.transform = "translateY(10px)";
+      el.classList.add("post-animate-in");
+      el.style.animationDelay = `${Math.min(index * 0.05, 0.4)}s`;
       postsList.appendChild(el);
-      setTimeout(() => {
-        el.style.transition = "all 0.4s ease";
-        el.style.opacity = "1";
-        el.style.transform = "translateY(0)";
-      }, index * 50);
     });
+    replayStaggeredAnimations(postsList, ".post");
   } catch (error) {
     showFeedback("Could not load posts.", "error");
   }
@@ -823,7 +853,12 @@ async function showProfile(userId) {
   navProfile.classList.add("active");
   setMobileNavActive("mobNavProfile");
 
-  profileContent.innerHTML = `<div style="padding: 40px; color: var(--muted);">Loading profile...</div>`;
+  profileContent.innerHTML = `
+    <div class="profile-loading">
+      <div class="search-spinner"></div>
+      <span>Loading profile...</span>
+    </div>`;
+  replayStaggeredAnimations(profileView, ".profile-loading");
 
   try {
     const userRes = await fetch(`/auth/users/${userId}`);
@@ -839,18 +874,21 @@ async function showProfile(userId) {
     const isMe = currentUser && String(currentUser.id) === String(userId);
     const regDate = new Date(userData.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+    const bannerStyle = userData.is_premium && userData.banner_path
+      ? `background-image: url(${userData.banner_path}?v=${Date.now()});`
+      : "";
+
     profileContent.innerHTML = `
-      <div class="profile-nav-top">
-        <button class="back-btn" onclick="MapsTo('feed')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-        </button>
-        <div class="mini-profile-info">
-          <span class="mini-name ${userData.is_premium ? 'premium-name-gradient' : ''}">${userData.display_name || userData.username}</span>
-          <span class="mini-meta">${userPosts.length} posts</span>
-        </div>
-      </div>
-      <div class="profile-header">
-        <div class="profile-banner" style="${userData.is_premium && userData.banner_path ? `background-image: url(${userData.banner_path}?v=${Date.now()}) !important; background-size: cover; background-position: center;` : ''}">
+      <div class="profile-hero profile-animate-header">
+        <div class="profile-banner" style="${bannerStyle}"></div>
+        <div class="profile-nav-top profile-animate-nav">
+          <button class="back-btn" onclick="MapsTo('feed')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+          <div class="mini-profile-info">
+            <span class="mini-name ${userData.is_premium ? 'premium-name-gradient' : ''}">${userData.display_name || userData.username}</span>
+            <span class="mini-meta">${userPosts.length} posts</span>
+          </div>
         </div>
         <div class="profile-avatar-area">
           <div class="large-avatar-wrap ${userData.is_premium ? 'round-avatar' : ''}">
@@ -869,7 +907,7 @@ async function showProfile(userId) {
         </div>
       </div>
       
-      <div class="profile-info">
+      <div class="profile-info profile-animate-info">
         <h2 style="display:flex;align-items:center;gap:8px;">
           <span class="${userData.is_premium ? 'premium-name-gradient' : ''}">${userData.display_name || userData.username}</span>
           ${userData.is_premium ? `<span class="verified-check" title="Core Flow"></span><span class="premium-check" title="Core Flow" style="width:22px;height:22px; display:inline-block; background: url('./assets/star.png'); background-size: contain;"></span>` : ''}
@@ -888,15 +926,19 @@ async function showProfile(userId) {
         </div>
       </div>
 
-      <div class="profile-tabs">
+      <div class="profile-tabs profile-animate-tabs">
         <div class="tabs">
            <button class="tab active">Posts</button>
            <button class="tab">Likes</button>
         </div>
       </div>
 
-      <div id="profilePosts" style="padding: 24px;"></div>
+      <div id="profilePosts" class="profile-posts-list profile-animate-posts"></div>
     `;
+    replayStaggeredAnimations(
+      profileView,
+      ".profile-animate-nav, .profile-animate-header, .profile-animate-info, .profile-animate-tabs, .profile-animate-posts"
+    );
 
     const profilePosts = document.getElementById("profilePosts");
     const tabPosts = profileContent.querySelector('.profile-tabs .tab:nth-child(1)');
@@ -905,11 +947,15 @@ async function showProfile(userId) {
     const renderPosts = (posts) => {
       profilePosts.innerHTML = "";
       if (posts.length === 0) {
-        profilePosts.innerHTML = `<p style="color: var(--muted); text-align: center; padding: 40px;">No posts yet.</p>`;
+        profilePosts.innerHTML = `<p class="profile-empty-posts">No posts yet.</p>`;
       } else {
-        posts.forEach(post => {
-          profilePosts.appendChild(createPostElement(post));
+        posts.forEach((post, index) => {
+          const el = createPostElement(post);
+          el.classList.add("post-animate-in");
+          el.style.animationDelay = `${Math.min(index * 0.05, 0.4)}s`;
+          profilePosts.appendChild(el);
         });
+        replayStaggeredAnimations(profilePosts, ".post");
       }
     };
 
@@ -924,7 +970,11 @@ async function showProfile(userId) {
     tabLikes.addEventListener('click', async () => {
       tabLikes.classList.add('active');
       tabPosts.classList.remove('active');
-      profilePosts.innerHTML = `<div style="padding: 40px; color: var(--muted); text-align: center;">Loading likes...</div>`;
+      profilePosts.innerHTML = `
+        <div class="profile-loading">
+          <div class="search-spinner"></div>
+          <span>Loading likes...</span>
+        </div>`;
       try {
         const likesRes = await fetch(`/users/${userId}/likes`);
         const likedPosts = await likesRes.json();
@@ -959,6 +1009,10 @@ function showFeed() {
   feedView.classList.remove("hidden");
   navFeed.classList.add("active");
   setMobileNavActive("mobNavFeed");
+  replayStaggeredAnimations(
+    feedView,
+    ".feed-animate-tabs, .feed-animate-composer, .feed-animate-posts"
+  );
   loadFeed();
 }
 
@@ -970,32 +1024,48 @@ function showSearchView() {
   setTimeout(() => searchInput && searchInput.focus(), 100);
 }
 
+function replayStaggeredAnimations(root, selector) {
+  if (!root) return;
+  root.querySelectorAll(selector).forEach((el) => {
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+  });
+}
+
 async function showNotifications() {
   hideAllViews();
   notificationsView.classList.remove("hidden");
   if (navNotifications) navNotifications.classList.add("active");
   setMobileNavActive("mobNavNotifications");
-  
-  notificationsContent.innerHTML = `<div style="padding: 40px; color: var(--muted); text-align: center;">Loading...</div>`;
+  replayStaggeredAnimations(notificationsView, ".notifications-header, .notifications-results");
+
+  notificationsContent.innerHTML = `
+    <div class="notifications-loading">
+      <div class="search-spinner"></div>
+      <span>Loading notifications...</span>
+    </div>`;
   
   try {
     const res = await fetch("/notifications");
     const notifications = await res.json();
     
     if (notifications.length === 0) {
-      notificationsContent.innerHTML = `<div style="padding: 80px 20px; text-align: center; color: var(--muted);">
-        <div style="margin-bottom: 20px; opacity: 0.5;"><img src="./assets/bell.png" width="48" height="48"></div>
-        <p style="font-weight: 700; font-size: 18px; color: rgba(255,255,255,0.6);">No notifications yet</p>
-        <p style="font-size: 14px; margin-top: 8px;">Interactions with your profile will appear here.</p>
-      </div>`;
+      notificationsContent.innerHTML = `
+        <div class="notifications-empty-state">
+          <div class="notifications-empty-icon"><img src="./assets/bell.png" width="48" height="48" alt=""></div>
+          <p>No notifications yet</p>
+          <span>Interactions with your profile will appear here.</span>
+        </div>`;
       return;
     }
 
     notificationsContent.innerHTML = "";
-    notifications.forEach(n => {
+    replayStaggeredAnimations(notificationsView, ".notifications-results");
+    notifications.forEach((n, index) => {
       const el = document.createElement("div");
       el.className = `notification-item ${n.is_read ? '' : 'unread'}`;
-      el.style = "padding: 16px; border-bottom: 1px solid var(--panel-border); display: flex; gap: 16px; align-items: flex-start; cursor: pointer;";
+      el.style.animationDelay = `${Math.min(index * 0.05, 0.4)}s`;
       el.dataset.id = n.id;
       
       let text = "";
@@ -1013,21 +1083,21 @@ async function showNotifications() {
       }
 
       el.innerHTML = `
-        <div class="mini-avatar" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: ${isSystem ? 'rgba(217, 119, 6, 0.08)' : 'transparent'}; border: ${isSystem ? '1px solid rgba(217, 119, 6, 0.15)' : '0'}; border-radius: 50%;">
+        <div class="notification-item-avatar ${isSystem ? 'system' : ''} mini-avatar">
           ${isSystem 
             ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>` 
-            : (n.sender_avatar ? `<img src="${n.sender_avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : (n.sender_emoji || "👤"))
+            : (n.sender_avatar ? `<img src="${n.sender_avatar}" alt="" />` : (n.sender_emoji || "👤"))
           }
         </div>
-        <div style="flex: 1;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <span style="font-weight: 800; color: #fff;">${isSystem ? "System" : (n.sender_display_name || n.sender_username)}</span>
-            <span style="font-size: 13px; color: ${isSystem ? '#d97706' : 'var(--muted)'}; font-weight: ${isSystem ? '500' : '400'};">${text}</span>
+        <div class="notification-item-body">
+          <div class="notification-item-title-row">
+            <span class="notification-item-name">${isSystem ? "System" : (n.sender_display_name || n.sender_username)}</span>
+            <span class="notification-item-action ${isSystem ? 'system' : ''}">${text}</span>
           </div>
-          ${(n.post_content || n.message_preview) ? `<p style="font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.8;">${n.post_content || n.message_preview}</p>` : ""}
-          <span style="font-size: 11px; color: var(--muted); opacity: 0.5; margin-top: 4px; display: block;">${timeAgo(new Date(n.created_at))}</span>
+          ${(n.post_content || n.message_preview) ? `<p class="notification-item-preview">${n.post_content || n.message_preview}</p>` : ""}
+          <span class="notification-item-time">${timeAgo(new Date(n.created_at))}</span>
         </div>
-        <div style="font-size: 18px; opacity: 0.6;">${isSystem ? "" : icon}</div>
+        <div class="notification-item-icon">${isSystem ? "" : icon}</div>
         <div class="notification-swipe-action" onclick="deleteNotification('${n.id}', this.parentElement)">Delete</div>
       `;
       
@@ -1068,6 +1138,7 @@ async function showNotifications() {
       };
       notificationsContent.appendChild(el);
     });
+    replayStaggeredAnimations(notificationsContent, ".notification-item");
 
     // Mark all as read
     fetch("/notifications/read", { method: "POST" });
@@ -1183,12 +1254,27 @@ async function showSinglePost(postId) {
 
 function toggleSidebar(show) {
   const sidebar = document.querySelector(".sidebar");
+  if (!sidebar) return;
   if (show === undefined) show = !sidebar.classList.contains("open");
-  
+
+  if (window.innerWidth > 900) {
+    show = false;
+  }
+
   sidebar.classList.toggle("open", show);
-  sidebarOverlay.classList.toggle("show", show);
+  document.body.classList.toggle("sidebar-open", show);
+  if (sidebarOverlay) {
+    sidebarOverlay.classList.toggle("show", show);
+    sidebarOverlay.setAttribute("aria-hidden", show ? "false" : "true");
+  }
   document.body.style.overflow = show ? "hidden" : "";
 }
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 900) {
+    toggleSidebar(false);
+  }
+});
 
 if (mobileMenuBtn) {
   mobileMenuBtn.addEventListener("click", () => toggleSidebar(true));

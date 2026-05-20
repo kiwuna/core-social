@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
 <title>Core</title>
 <link rel="icon" type="image/png" href="./favicon.png" />
 <link rel="manifest" href="/manifest.json" />
@@ -20,6 +20,7 @@
 <body>
   <p id="feedbackMessage" class="feedback-message" role="status" aria-live="polite"></p>
   <main class="dashboard">
+    <div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="logo-area">
@@ -54,14 +55,14 @@
     </aside>
 
     <!-- Content Area -->
-    <div id="contentArea" style="display: contents;">
+    <div id="contentArea" class="content-area">
       
       <!-- Main Feed -->
       <section id="feedView" class="feed" style="position: relative;">
         
         <!-- FIXED HEADER (Outside Scroll Container) -->
-        <div id="stickyHeader" class="sticky-header">
-          <div class="feed-tabs-container">
+        <div id="stickyHeader" class="sticky-header feed-view-header">
+          <div class="feed-tabs-container feed-animate-tabs">
             <button id="mobileMenuBtn" class="mobile-menu-btn">
               <span id="userEmojiMobile" class="mini-avatar">👻</span>
             </button>
@@ -73,7 +74,7 @@
           </div>
 
           <!-- Composer -->
-          <div class="composer-container">
+          <div class="composer-container feed-animate-composer">
             <form id="postForm" class="composer" autocomplete="off">
               <div class="composer-top">
                 <span id="userEmojiMini" class="mini-avatar">👻</span>
@@ -126,10 +127,10 @@
           </div>
         </div>
 
-        <div id="feedScrollArea" class="feed-content">
+        <div id="feedScrollArea" class="feed-content feed-animate-posts">
           <!-- Feed Posts Wrapper -->
           <div class="feed-posts-wrapper" style="padding-top: 0;">
-            <div id="feedPosts" style="display: flex; flex-direction: column; gap: 12px;"></div>
+            <div id="feedPosts" class="feed-posts-list"></div>
           </div>
         </div>
       </section>
@@ -189,21 +190,24 @@
 
       <!-- Profile View -->
       <section id="profileView" class="feed hidden">
-        <div id="profileContent" class="feed-content" style="padding: 0; overflow-x: hidden;">
+        <div id="profileContent" class="profile-view-container">
           <!-- Profile header and posts injected here -->
         </div>
       </section>
 
       <!-- Notifications View -->
       <section id="notificationsView" class="feed hidden">
-        <div class="sticky-header">
-          <div class="feed-tabs-container" style="justify-content: space-between; align-items: center; padding: 0 24px;">
-            <h2 style="font-size: 19px; font-weight: 800; color: #fff;">Notifications</h2>
+        <div class="notifications-view-container">
+          <div class="notifications-header">
+            <div class="notifications-header-text">
+              <h2 class="notifications-title">Notifications</h2>
+              <p class="notifications-subtitle">Likes, follows, comments, and messages</p>
+            </div>
             <button class="btn-clear-all" id="btnClearAll">Clear All</button>
           </div>
-        </div>
-        <div id="notificationsContent" class="feed-content" style="padding: 24px;">
-          <!-- Notifications injected here -->
+          <div id="notificationsContent" class="notifications-results">
+            <!-- Notifications injected here -->
+          </div>
         </div>
       </section>
 
@@ -223,8 +227,8 @@
         </div>
         <div class="chat-input-area">
           <form id="chatForm" autocomplete="off" class="chat-form">
-            <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" class="chat-input">
-            <button type="submit" class="btn-pill btn-edit" style="border-radius: 24px; padding: 0 24px; font-weight: 600;">Send</button>
+            <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" class="chat-input">
+            <button type="submit" class="chat-send-btn">Send</button>
           </form>
         </div>
       </section>

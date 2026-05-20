@@ -90,6 +90,27 @@ const closePollButton = document.getElementById("closePollButton");
 const addPollOptionButton = document.getElementById("addPollOption");
 const pollOptionsContainer = document.getElementById("pollOptionsContainer");
 const pollQuestionInput = document.getElementById("pollQuestion");
+
+let currentUser = null;
+
+async function fetchCurrentUser() {
+  try {
+    const response = await fetch("/auth/me", { credentials: "include" });
+    if (!response.ok) {
+      window.location.href = "login.html";
+      return null;
+    }
+
+    const data = await response.json();
+    currentUser = data.user || null;
+    return currentUser;
+  } catch (error) {
+    console.error("Failed to fetch current user:", error);
+    window.location.href = "login.html";
+    return null;
+  }
+}
+
 (async function init() {
   await fetchCurrentUser();
   

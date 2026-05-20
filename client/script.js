@@ -195,7 +195,6 @@ const confirmMessage = document.getElementById("confirmMessage");
 const confirmCancel = document.getElementById("confirmCancel");
 const confirmProceed = document.getElementById("confirmProceed");
 const checkoutForm = document.querySelector('form[action="/create-checkout-session"]');
-
 const sidebarOverlay = document.getElementById("sidebarOverlay");
 
 function showFeedback(message, type = "info") {
@@ -250,10 +249,12 @@ function updateImagePreview(file) {
 
 function updateAuthUI() {
   if (currentUser) {
-    userNameDisplay.textContent = currentUser.display_name || currentUser.username;
-    userNameDisplay.classList.toggle('premium-name-gradient', !!currentUser.is_premium);
-    userHandleDisplay.textContent = `@${currentUser.username.toLowerCase()}`;
-    userEmojiLarge.textContent = currentUser.emoji || "👤";
+    if (userNameDisplay) {
+      userNameDisplay.textContent = currentUser.display_name || currentUser.username;
+      userNameDisplay.classList.toggle('premium-name-gradient', !!currentUser.is_premium);
+    }
+    if (userHandleDisplay) userHandleDisplay.textContent = `@${currentUser.username.toLowerCase()}`;
+    if (userEmojiLarge) userEmojiLarge.textContent = currentUser.emoji || "👤";
     if (mobNavProfileIcon) mobNavProfileIcon.textContent = currentUser.emoji || "👤";
 
     if (userEmojiMini) {
@@ -335,9 +336,9 @@ function updateAuthUI() {
     logoutBtn.classList.remove("hidden");
     loginLink.classList.add("hidden");
   } else {
-    userNameDisplay.textContent = "Profile";
-    userHandleDisplay.textContent = "@anonymous";
-    userEmojiLarge.textContent = "👤";
+    if (userNameDisplay) userNameDisplay.textContent = "Profile";
+    if (userHandleDisplay) userHandleDisplay.textContent = "@anonymous";
+    if (userEmojiLarge) userEmojiLarge.textContent = "👤";
     if (mobNavProfileIcon) mobNavProfileIcon.textContent = "👤";
     if (userEmojiMini) {
       userEmojiMini.textContent = "👻";
@@ -1107,23 +1108,6 @@ async function showNotifications() {
         deleteNotification(n.id, el);
       };
 
-      // Swipe to Delete (Mobile)
-      let touchStartX = 0;
-      el.ontouchstart = (e) => touchStartX = e.touches[0].clientX;
-      el.ontouchmove = (e) => {
-        const touchX = e.touches[0].clientX;
-        const diff = touchStartX - touchX;
-        if (diff > 50) el.classList.add('swiped');
-        if (diff < -50) el.classList.remove('swiped');
-        
-        // Auto-delete on deep swipe
-        if (diff > 150) {
-           el.style.transition = 'transform 0.2s';
-           el.style.transform = 'translateX(-100%)';
-           setTimeout(() => deleteNotification(n.id, el), 200);
-        }
-      };
-
       el.onclick = (e) => {
         if (e.target.classList.contains('notification-swipe-action')) return;
         if (n.type === 'warning') {
@@ -1153,7 +1137,6 @@ async function deleteNotification(id, element) {
     try {
       const res = await fetch(`/notifications/${id}`, { method: "DELETE" });
       if (res.ok) {
-        element.style.transform = "translateX(-100%)";
         element.style.opacity = "0";
         setTimeout(() => {
           element.remove();
@@ -1252,6 +1235,14 @@ async function showSinglePost(postId) {
 // Mobile Navigation & Sidebar Logic
 // ═══════════════════════════════════════
 
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 900) {
+    document.body.style.overflow = "";
+    document.body.classList.remove("sidebar-open");
+  }
+});
+
+// Mobile Nav Clicks
 function toggleSidebar(show) {
   const sidebar = document.querySelector(".sidebar");
   if (!sidebar) return;
@@ -1280,9 +1271,10 @@ if (mobileMenuBtn) {
   mobileMenuBtn.addEventListener("click", () => toggleSidebar(true));
 }
 
-sidebarOverlay.addEventListener("click", () => toggleSidebar(false));
+if (sidebarOverlay) {
+  sidebarOverlay.addEventListener("click", () => toggleSidebar(false));
+}
 
-// Mobile Nav Clicks
 function setMobileNavActive(id) {
   const items = document.querySelectorAll(".mobile-nav-item");
   items.forEach(item => item.classList.toggle("active", item.id === id));
@@ -1328,9 +1320,7 @@ if (mobNavProfile) {
 const sidebarLinks = document.querySelectorAll(".nav-item, .footer-link");
 sidebarLinks.forEach(link => {
   link.addEventListener("click", () => {
-    if (window.innerWidth <= 900) {
-      toggleSidebar(false);
-    }
+    if (window.innerWidth <= 900) toggleSidebar(false);
   });
 });
 
@@ -1656,11 +1646,11 @@ logoutBtn.addEventListener("click", async () => {
   if (res.ok) window.location.reload();
 });
 
-navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
+if (navFeed) navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
 if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo('search'); });
 if (document.getElementById("navNotifications")) document.getElementById("navNotifications").addEventListener("click", (e) => { e.preventDefault(); MapsTo('notifications'); });
 if (document.getElementById("btnClearAll")) document.getElementById("btnClearAll").addEventListener("click", () => clearAllNotifications());
-navProfile.addEventListener("click", (e) => { 
+if (navProfile) navProfile.addEventListener("click", (e) => { 
   e.preventDefault(); 
   if (currentUser) MapsTo('profile/' + currentUser.id); 
   else window.location.href = "login.html";
@@ -2204,9 +2194,9 @@ if (removeBannerBtn) {
 }
 
 // Navigation Listeners
-navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
+if (navFeed) navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
 if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo('search'); });
-navProfile.addEventListener("click", (e) => { 
+if (navProfile) navProfile.addEventListener("click", (e) => { 
   e.preventDefault(); 
   if (currentUser) MapsTo('profile/' + currentUser.id); 
   else window.location.href = "login.html";
@@ -2700,10 +2690,12 @@ function appendMessage(msg) {
   div.style.flexDirection = "column";
   div.style.alignItems = isMe ? "flex-end" : "flex-start";
   div.style.marginBottom = shouldShowTime ? "12px" : "4px";
+  div.style.paddingLeft = isMe ? "0" : "8px";
+  div.style.paddingRight = isMe ? "8px" : "0";
 
   div.innerHTML = `
     ${shouldShowTime ? `<span style="font-size: 10px; color: var(--muted); margin: 0 0 3px; opacity: 0.7;">${messageTime}</span>` : ""}
-    <div style="max-width: 70%; padding: 10px 14px; border-radius: 18px; background: ${isMe ? '#7c3aed' : 'var(--panel)'}; color: #fff; font-size: 14px; line-height: 1.4; word-wrap: break-word;">
+    <div style="max-width: min(70%, 520px); padding: 10px 14px; border-radius: 18px; background: ${isMe ? '#7c3aed' : 'var(--panel)'}; color: #fff; font-size: 14px; line-height: 1.4; word-wrap: break-word;">
       ${msg.content}
     </div>
   `;
@@ -2767,11 +2759,3 @@ if (testPushBtn) {
     }
   });
 }
-
-
-
-
-
-
-
-

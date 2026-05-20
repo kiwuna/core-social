@@ -26,7 +26,7 @@
         <a id="navNotifications" class="nav-item" href="#" style="position: relative;">
           <span class="ico"><img src="./assets/bell.png" width="22" height="22"></span> 
           <span>Notifications</span>
-          <div id="unreadBadge" style="position: absolute; top: 12px; left: 28px; width: 8px; height: 8px; background: #ff4444; border-radius: 50%; display: none; border: 2px solid var(--panel);"></div>
+          <div id="unreadBadge" aria-hidden="true" style="position: absolute; top: 50%; right: 16px; width: 10px; height: 10px; background: #ff2b52; border-radius: 50%; display: none; border: 2px solid var(--panel); z-index: 5; box-shadow: 0 0 0 2px rgba(255, 43, 82, 0.18); transform: translateY(-50%);"></div>
         </a>
         <a id="navProfile" class="nav-item" href="#">
           <span class="ico" id="userEmojiLarge">👤</span> 
@@ -196,6 +196,28 @@
         </div>
         <div id="notificationsContent" class="feed-content" style="padding: 24px;">
           <!-- Notifications injected here -->
+        </div>
+      </section>
+
+      <!-- Messages View -->
+      <section id="messagesView" class="feed hidden" style="display: flex; flex-direction: column; height: 100vh;">
+        <div class="sticky-header" style="flex-shrink: 0;">
+          <div class="feed-tabs-container" style="justify-content: space-between; align-items: center; padding: 0 24px;">
+            <button class="back-btn" onclick="MapsTo('profile/' + currentChatUserId)" style="background: none; border: none; color: #fff; cursor: pointer;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:24px; height:24px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </button>
+            <h2 id="chatUserName" style="font-size: 19px; font-weight: 800; color: #fff;">Chat</h2>
+            <div style="width:24px"></div>
+          </div>
+        </div>
+        <div id="chatMessages" class="feed-content" style="padding: 24px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex: 1;">
+          <!-- Messages go here -->
+        </div>
+        <div class="chat-input-area" style="padding: 16px; border-top: 1px solid var(--panel-border); background: var(--bg); flex-shrink: 0;">
+          <form id="chatForm" style="display: flex; gap: 8px; max-width: 600px; margin: 0 auto;">
+            <input type="text" id="chatInput" placeholder="Type a message..." style="flex: 1; padding: 14px 20px; border-radius: 24px; border: 1px solid var(--panel-border); background: var(--panel); color: #fff; outline: none; font-size: 15px;">
+            <button type="submit" class="btn-pill btn-edit" style="border-radius: 24px; padding: 0 24px; font-weight: 600;">Send</button>
+          </form>
         </div>
       </section>
 
@@ -468,7 +490,7 @@
     <a href="#" class="mobile-nav-item" id="mobNavNotifications" style="position: relative;">
       <span class="ico"><img src="./assets/bell.png" width="24" height="24"></span>
       <span>Alerts</span>
-      <div id="mobUnreadBadge" style="position: absolute; top: 8px; right: 28%; width: 8px; height: 8px; background: #ff4444; border-radius: 50%; display: none; border: 2px solid var(--bg);"></div>
+      <div id="mobUnreadBadge" aria-hidden="true" style="position: absolute; top: 50%; right: 26%; width: 10px; height: 10px; background: #ff2b52; border-radius: 50%; display: none; border: 2px solid var(--bg); z-index: 5; box-shadow: 0 0 0 2px rgba(255, 43, 82, 0.18); transform: translateY(-50%);"></div>
     </a>
     <a href="#" class="mobile-nav-item" id="mobNavProfile">
       <span class="ico">👤</span>
@@ -563,6 +585,7 @@
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script src="./script.js"></script>
 </body>
 </html>

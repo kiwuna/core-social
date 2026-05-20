@@ -104,6 +104,16 @@ async function migrate() {
   `);
 
   await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id SERIAL PRIMARY KEY,
+      sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pgPool.query(`
     CREATE TABLE IF NOT EXISTS "session" (
       "sid" varchar NOT NULL COLLATE "default",
       "sess" json NOT NULL,
@@ -120,7 +130,7 @@ async function migrate() {
   } catch (e) {}
 
   // 2. Migrate data
-  const tables = ["users", "posts", "likes", "comments", "polls", "poll_options", "poll_votes", "follows"];
+  const tables = ["users", "posts", "likes", "comments", "polls", "poll_options", "poll_votes", "follows", "messages"];
 
   for (const table of tables) {
     console.log(`Migrating table: ${table}...`);

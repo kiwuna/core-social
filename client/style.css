@@ -2431,3 +2431,37 @@ body {
   -webkit-text-fill-color: transparent;
   font-weight: 800;
 }
+
+/* Messaging UI Enhancements */
+.message-bubble {
+  animation: messageAppear 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  transform-origin: bottom center;
+}
+
+@keyframes messageAppear {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 900px) {
+  #messagesView {
+    height: 100dvh !important;
+    padding-bottom: 70px; /* Space for mobile bottom nav */
+  }
+  
+  #chatMessages {
+    padding: 16px !important;
+  }
+  
+  .chat-input-area {
+    padding: 12px !important;
+  }
+  
+  #chatInput {
+    padding: 10px 16px !important;
+  }
+}

@@ -1,35 +1,80 @@
 const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 require("dotenv").config();
 
-// FIXED: Using Resend via standard SMTP on port 465 to bypass Gmail network restrictions
-const transporter = nodemailer.createTransport({
-  host: "smtp.resend.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "resend",
-    pass: process.env.EMAIL_PASS // Your Resend API Key (re_...)
-  }
-});
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS) || 10000;
+const EMAIL_FROM = process.env.EMAIL_FROM || "onboarding@resend.dev";
+const EMAIL_PASS = process.env.EMAIL_PASS;
+const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.RESEND_API;
+const USE_RESEND_API = !!RESEND_API_KEY || process.env.EMAIL_TRANSPORT === "resend-api";
+
+let resendClient = null;
+if (USE_RESEND_API && RESEND_API_KEY) {
+  resendClient = new Resend(RESEND_API_KEY);
+}
+
+const smtpTransporter = !USE_RESEND_API && EMAIL_PASS
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.resend.com",
+      port: Number(process.env.SMTP_PORT) || 465,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER || "resend",
+        pass: EMAIL_PASS
+      }
+    })
+  : null;
+
+function withTimeout(promise, timeoutMs, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    timeout
+  ]);
+}
 
 /**
  * Generic function to send an email
  */
 async function sendEmail(to, subject, html) {
-  const mailOptions = {
-    // FIXED: Must be exactly like this for the Resend free tier/unverified domains
-    from: "onboarding@resend.dev", 
-    to: to,
-    subject: subject,
-    html: html
-  };
-
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("📬 Email sent successfully via Resend:", info.messageId);
-    return info;
+    if (resendClient) {
+      const info = await withTimeout(
+        resendClient.emails.send({
+          from: EMAIL_FROM,
+          to,
+          subject,
+          html
+        }),
+        EMAIL_TIMEOUT_MS,
+        "Resend API request"
+      );
+      console.log("Email sent successfully via Resend API:", info.id || "ok");
+      return info;
+    }
+
+    if (smtpTransporter) {
+      const info = await withTimeout(
+        smtpTransporter.sendMail({
+          from: EMAIL_FROM,
+          to,
+          subject,
+          html
+        }),
+        EMAIL_TIMEOUT_MS,
+        "SMTP email send"
+      );
+      console.log("Email sent successfully via SMTP:", info.messageId);
+      return info;
+    }
+
+    throw new Error("No email transport configured. Set RESEND_API_KEY or EMAIL_PASS in environment variables.");
   } catch (error) {
-    console.error("❌ Resend SMTP Error:", error.message);
+    console.error("Email send error:", error.message);
     throw error;
   }
 }

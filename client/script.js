@@ -96,6 +96,7 @@ const feedView = document.getElementById("feedView");
 const searchView = document.getElementById("searchView");
 const notificationsView = document.getElementById("notificationsView");
 const notificationsContent = document.getElementById("notificationsContent");
+const messagesView = document.getElementById("messagesView");
 
 // Nav
 const navFeed = document.getElementById("navFeed");
@@ -373,6 +374,7 @@ async function fetchCurrentUser() {
       currentUser = data.user;
       updateAuthUI();
       checkUserWarnings();
+      if(typeof initSocket === 'function') initSocket();
     } else if (res.status === 403) {
       const data = await res.json();
       if (data.error === "suspended") {
@@ -637,6 +639,7 @@ function hideAllViews() {
   feedView.classList.add("hidden");
   if (searchView) searchView.classList.add("hidden");
   profileView.classList.add("hidden");
+  if (messagesView) messagesView.classList.add("hidden");
   if (notificationsView) notificationsView.classList.add("hidden");
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
 }
@@ -664,6 +667,9 @@ window.MapsTo = function(viewPath, push = true) {
       break;
     case 'profile':
       showProfile(id);
+      break;
+    case 'messages':
+      showMessages(id);
       break;
     case 'notifications':
       showNotifications();
@@ -744,7 +750,7 @@ async function showProfile(userId) {
           <div class="profile-actions">
             ${isMe 
               ? '<button class="btn-pill btn-edit">Edit Profile</button><button class="btn-pill btn-secondary">Settings</button>' 
-              : `<button class="btn-pill btn-follow ${followData.isFollowing ? 'following' : ''}" data-user-id="${userId}">${followData.isFollowing ? 'Following' : 'Follow'}</button><button class="btn-pill btn-secondary">Message</button>`}
+              : `<button class="btn-pill btn-follow ${followData.isFollowing ? 'following' : ''}" data-user-id="${userId}">${followData.isFollowing ? 'Following' : 'Follow'}</button><button class="btn-pill btn-secondary" onclick="MapsTo('messages/${userId}')">Message</button>`}
           </div>
         </div>
       </div>
@@ -886,6 +892,7 @@ async function showNotifications() {
       if (n.type === 'like') { text = "liked your post"; icon = "❤️"; }
       else if (n.type === 'follow') { text = "started following you"; icon = "👤"; }
       else if (n.type === 'comment') { text = "commented on your post"; icon = "💬"; }
+      else if (n.type === 'message') { text = "sent you a message"; icon = "✉️"; }
       else if (n.type === 'warning') { 
         text = "You received a warning"; 
         icon = "⚠️";
@@ -938,6 +945,8 @@ async function showNotifications() {
         if (e.target.classList.contains('notification-swipe-action')) return;
         if (n.type === 'warning') {
           showWarningModalDirectly();
+        } else if (n.type === 'message') {
+          MapsTo('messages/' + n.sender_id);
         } else if (n.post_id) {
           MapsTo('post/' + n.post_id);
         } else {
@@ -1010,8 +1019,14 @@ function showConfirm(title, message, onConfirm) {
 async function updateNotificationBadge(hasUnread) {
   const badge = document.getElementById("unreadBadge");
   const mobBadge = document.getElementById("mobUnreadBadge");
-  if (badge) badge.style.display = hasUnread ? "block" : "none";
-  if (mobBadge) mobBadge.style.display = hasUnread ? "block" : "none";
+  if (badge) {
+    badge.style.display = hasUnread ? "block" : "none";
+    badge.setAttribute("aria-hidden", hasUnread ? "false" : "true");
+  }
+  if (mobBadge) {
+    mobBadge.style.display = hasUnread ? "block" : "none";
+    mobBadge.setAttribute("aria-hidden", hasUnread ? "false" : "true");
+  }
 }
 
 async function checkUnreadNotifications() {
@@ -2510,3 +2525,136 @@ if (lockSyncLogoutBtn) {
   checkUnreadNotifications();
   setInterval(checkUnreadNotifications, 30000); // Check every 30s
 })();
+
+// ═══════════════════════════════════════
+// Messaging Logic
+// ═══════════════════════════════════════
+
+let socket;
+let currentChatUserId = null;
+
+function initSocket() {
+  if (!socket && currentUser) {
+    socket = io();
+    socket.on('connect', () => {
+      socket.emit('register', currentUser.id);
+    });
+
+    socket.on('new_notification', (notification) => {
+      if (notification && notification.type === 'message') {
+        updateNotificationBadge(true);
+      }
+    });
+
+    socket.on('receive_message', (msg) => {
+      if (msg.sender_id !== currentUser.id) {
+        updateNotificationBadge(true);
+      }
+
+      if (currentChatUserId && (msg.sender_id === Number(currentChatUserId) || msg.receiver_id === Number(currentChatUserId))) {
+        appendMessage(msg);
+        scrollToBottom();
+      } else {
+        if (msg.sender_id !== currentUser.id) {
+          showFeedback("New message received", "info");
+        }
+      }
+    });
+  }
+}
+
+async function showMessages(friendId) {
+  if (!currentUser) return window.location.href = "login.html";
+  
+  if (!socket) initSocket();
+  hideAllViews();
+  currentChatUserId = friendId;
+  if (messagesView) messagesView.classList.remove("hidden");
+  
+  try {
+    const userRes = await fetch(`/auth/users/${friendId}`);
+    if (userRes.ok) {
+      const userData = (await userRes.json()).user;
+      document.getElementById("chatUserName").textContent = userData.display_name || userData.username;
+    }
+  } catch (e) {}
+
+  const chatMessages = document.getElementById("chatMessages");
+  chatMessages.innerHTML = `<div style="text-align:center; color: var(--muted); padding: 20px;">Loading chat...</div>`;
+  
+  try {
+    const res = await fetch(`/api/messages/${friendId}`);
+    const messages = await res.json();
+    
+    chatMessages.innerHTML = "";
+    if (messages.length === 0) {
+      chatMessages.innerHTML = `<div style="text-align:center; color: var(--muted); padding: 20px;">Say hi!</div>`;
+    } else {
+      messages.forEach(appendMessage);
+      scrollToBottom();
+    }
+  } catch(e) {
+    chatMessages.innerHTML = `<div style="text-align:center; color: var(--muted); padding: 20px;">Error loading messages.</div>`;
+  }
+}
+
+function appendMessage(msg) {
+  const chatMessages = document.getElementById("chatMessages");
+  if (chatMessages.innerHTML.includes("Say hi!")) {
+    chatMessages.innerHTML = "";
+  }
+
+  const isMe = msg.sender_id === currentUser.id;
+  const messageDate = new Date(msg.created_at);
+  const messageTime = messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const previousBubble = chatMessages.lastElementChild;
+  const previousSenderId = previousBubble ? Number(previousBubble.dataset.senderId) : null;
+  const previousDateMs = previousBubble ? Number(previousBubble.dataset.createdAtMs) : null;
+  const shouldShowTime = !previousBubble
+    || previousSenderId !== msg.sender_id
+    || !previousDateMs
+    || (messageDate.getTime() - previousDateMs) > 5 * 60 * 1000;
+  const div = document.createElement("div");
+  div.className = "message-bubble";
+  div.dataset.senderId = String(msg.sender_id);
+  div.dataset.createdAtMs = String(messageDate.getTime());
+  div.style.display = "flex";
+  div.style.flexDirection = "column";
+  div.style.alignItems = isMe ? "flex-end" : "flex-start";
+  div.style.marginBottom = shouldShowTime ? "12px" : "4px";
+
+  div.innerHTML = `
+    ${shouldShowTime ? `<span style="font-size: 10px; color: var(--muted); margin: 0 0 3px; opacity: 0.7;">${messageTime}</span>` : ""}
+    <div style="max-width: 70%; padding: 10px 14px; border-radius: 18px; background: ${isMe ? '#7c3aed' : 'var(--panel)'}; color: #fff; font-size: 14px; line-height: 1.4; word-wrap: break-word;">
+      ${msg.content}
+    </div>
+  `;
+  chatMessages.appendChild(div);
+}
+
+function scrollToBottom() {
+  const chatMessages = document.getElementById("chatMessages");
+  if (chatMessages) {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const chatForm = document.getElementById("chatForm");
+  if (chatForm) {
+    chatForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = document.getElementById("chatInput");
+      const text = input.value.trim();
+      if (!text || !currentChatUserId || !socket) return;
+      
+      socket.emit("send_message", {
+        sender_id: currentUser.id,
+        receiver_id: Number(currentChatUserId),
+        content: text
+      });
+      
+      input.value = "";
+    });
+  }
+});

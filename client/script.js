@@ -2146,6 +2146,7 @@ if (btnRequestSync) {
     try {
       const response = await fetch("/api/sync-request", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: rawEmail })
       });
@@ -2196,6 +2197,7 @@ if (btnVerifySync) {
     try {
       const res = await fetch("/api/sync-verify", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code })
       });
@@ -2240,6 +2242,7 @@ if (btnUnlinkRequest) {
     try {
       const res = await fetch("/api/unlink-request", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" }
       });
 
@@ -2277,6 +2280,7 @@ if (btnUnlinkVerify) {
     try {
       const res = await fetch("/api/unlink-verify", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code })
       });
@@ -2411,6 +2415,7 @@ if (btnLockSendCode) {
     try {
       const res = await fetch("/api/sync-request", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailValue })
       });
@@ -2458,6 +2463,7 @@ if (btnLockVerify) {
     try {
       const res = await fetch("/api/sync-verify", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code })
       });

@@ -27,6 +27,7 @@ const io = new Server(server, {
 
 const PORT = Number(process.env.PORT) || 3000;
 app.locals.db = db;
+app.set("trust proxy", 1);
 
 // Map to store connected users: userId -> Set of socket IDs
 const userSockets = new Map();

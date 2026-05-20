@@ -2548,11 +2548,11 @@ body {
   border-top: 1px solid var(--panel-border);
   background: rgba(10, 10, 10, 0.98);
   flex-shrink: 0;
-  padding-bottom: calc(12px + var(--safe-bottom)) !important;
+  padding-bottom: 12px !important;
 }
 
   html.keyboard-open .chat-input-area {
-    bottom: calc(var(--keyboard-offset) + var(--safe-bottom));
+    bottom: var(--keyboard-offset);
   }
 
 .chat-form {

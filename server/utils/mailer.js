@@ -6,11 +6,16 @@ const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS) || 10000;
 const EMAIL_FROM = process.env.EMAIL_FROM || "onboarding@resend.dev";
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.RESEND_API;
-const USE_RESEND_API = !!RESEND_API_KEY || process.env.EMAIL_TRANSPORT === "resend-api";
+const EMAIL_TRANSPORT = (process.env.EMAIL_TRANSPORT || "").toLowerCase();
+const EMAIL_PASS_LOOKS_LIKE_RESEND_KEY = typeof EMAIL_PASS === "string" && EMAIL_PASS.startsWith("re_");
+const USE_RESEND_API = !!RESEND_API_KEY || EMAIL_TRANSPORT === "resend-api" || EMAIL_PASS_LOOKS_LIKE_RESEND_KEY;
 
 let resendClient = null;
-if (USE_RESEND_API && RESEND_API_KEY) {
-  resendClient = new Resend(RESEND_API_KEY);
+if (USE_RESEND_API) {
+  const apiKey = RESEND_API_KEY || (EMAIL_PASS_LOOKS_LIKE_RESEND_KEY ? EMAIL_PASS : null);
+  if (apiKey) {
+    resendClient = new Resend(apiKey);
+  }
 }
 
 const smtpTransporter = !USE_RESEND_API && EMAIL_PASS
@@ -43,6 +48,8 @@ function withTimeout(promise, timeoutMs, label) {
 async function sendEmail(to, subject, html) {
   try {
     if (resendClient) {
+      const apiKeySource = RESEND_API_KEY ? "RESEND_API_KEY" : (EMAIL_PASS_LOOKS_LIKE_RESEND_KEY ? "EMAIL_PASS" : "unknown");
+      console.log(`Email transport selected: Resend API via ${apiKeySource}`);
       const info = await withTimeout(
         resendClient.emails.send({
           from: EMAIL_FROM,
@@ -58,6 +65,7 @@ async function sendEmail(to, subject, html) {
     }
 
     if (smtpTransporter) {
+      console.log("Email transport selected: SMTP fallback");
       const info = await withTimeout(
         smtpTransporter.sendMail({
           from: EMAIL_FROM,

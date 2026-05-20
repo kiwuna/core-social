@@ -911,7 +911,7 @@ async function showNotifications() {
             <span style="font-weight: 800; color: #fff;">${isSystem ? "System" : (n.sender_display_name || n.sender_username)}</span>
             <span style="font-size: 13px; color: ${isSystem ? '#d97706' : 'var(--muted)'}; font-weight: ${isSystem ? '500' : '400'};">${text}</span>
           </div>
-          ${n.post_content ? `<p style="font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.8;">${n.post_content}</p>` : ""}
+          ${(n.post_content || n.message_preview) ? `<p style="font-size: 14px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.8;">${n.post_content || n.message_preview}</p>` : ""}
           <span style="font-size: 11px; color: var(--muted); opacity: 0.5; margin-top: 4px; display: block;">${timeAgo(new Date(n.created_at))}</span>
         </div>
         <div style="font-size: 18px; opacity: 0.6;">${isSystem ? "" : icon}</div>

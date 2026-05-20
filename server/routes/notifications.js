@@ -12,7 +12,11 @@ router.get("/", isAuthenticated, async (req, res, next) => {
       SELECT 
         n.id, n.type, n.is_read, n.created_at, n.post_id, n.sender_id,
         u.username as sender_username, u.display_name as sender_display_name, u.emoji as sender_emoji, u.avatar_path as sender_avatar,
-        p.content as post_content
+        p.content as post_content,
+        CASE 
+          WHEN n.type = 'message' THEN 'New message'
+          ELSE NULL
+        END as message_preview
       FROM notifications n
       JOIN users u ON n.sender_id = u.id
       LEFT JOIN posts p ON n.post_id = p.id

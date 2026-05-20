@@ -224,8 +224,15 @@ router.post("/unlink-request", isAuthenticated, async (req, res, next) => {
     const user = result.rows[0];
 
     if (!user || !user.email) {
-
-      return res.status(400).json({ error: "No email address linked to this account." });
+      const fallback = await db.query(
+        "SELECT email FROM users WHERE id = $1",
+        [userId]
+      );
+      const fallbackEmail = fallback.rows[0] && fallback.rows[0].email;
+      if (!fallbackEmail) {
+        return res.status(400).json({ error: "No email address linked to this account." });
+      }
+      user.email = fallbackEmail;
 
     }
 

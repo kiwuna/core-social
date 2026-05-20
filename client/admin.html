@@ -809,6 +809,7 @@
             <div class="action-buttons">
               <button class="btn-admin-action warn" onclick="toggleWarningInput(${user.id})">Issue Warning</button>
               <button class="btn-admin-action edit" onclick="openEditModalForm(${user.id})">Edit Profile</button>
+              <button class="btn-admin-action delete" onclick="deleteUser(${user.id})">Delete User</button>
             </div>
             <div id="warning-input-container-${user.id}" style="display: none;"></div>
           </td>
@@ -871,6 +872,24 @@
         }
       } catch (err) {
         showFeedback("Network error warning user.", "error");
+      }
+    };
+
+    window.deleteUser = async function(userId) {
+      if (!confirm("Delete this user and all of their posts, comments, likes, and messages?")) return;
+      try {
+        const res = await fetch(`/api/admin/users/${userId}`, {
+          method: "DELETE"
+        });
+        if (res.ok) {
+          showFeedback("User deleted successfully", "success");
+          loadDashboard();
+        } else {
+          const err = await res.json();
+          showFeedback(err.error || "Failed to delete user.", "error");
+        }
+      } catch (err) {
+        showFeedback("Network error deleting user.", "error");
       }
     };
 

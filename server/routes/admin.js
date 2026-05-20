@@ -182,4 +182,37 @@ router.post("/users/:id/edit", isAdmin, async (req, res, next) => {
   }
 });
 
+// Delete a user and all of their content
+router.delete("/users/:id", isAdmin, async (req, res, next) => {
+  const db = req.app.locals.db;
+  const targetId = parseInt(req.params.id);
+
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  try {
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM notifications WHERE recipient_id = $1 OR sender_id = $1", [targetId]);
+      await client.query("DELETE FROM likes WHERE user_id = $1", [targetId]);
+      await client.query("DELETE FROM comments WHERE user_id = $1", [targetId]);
+      await client.query("DELETE FROM posts WHERE user_id = $1", [targetId]);
+      await client.query("DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $1", [targetId]);
+      await client.query("DELETE FROM follows WHERE follower_id = $1 OR following_id = $1", [targetId]);
+      await client.query("DELETE FROM users WHERE id = $1", [targetId]);
+      await client.query("COMMIT");
+      res.json({ success: true, message: "User and all related content deleted." });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

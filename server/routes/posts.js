@@ -313,6 +313,40 @@ router.post("/:id/like", isAuthenticated, async (req, res, next) => {
   }
 });
 
+// Unlike a post (Protected)
+router.delete("/:id/like", isAuthenticated, async (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+  const userId = req.session.userId;
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id." });
+  }
+
+  try {
+    const likeCheck = await db.query(`SELECT id FROM likes WHERE user_id = $1 AND post_id = $2`, [userId, postId]);
+    if (!likeCheck.rows[0]) {
+      return res.status(400).json({ error: "You have not liked this post yet." });
+    }
+
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`DELETE FROM likes WHERE user_id = $1 AND post_id = $2`, [userId, postId]);
+      const updateResult = await client.query(`UPDATE posts SET likes = GREATEST(likes - 1, 0) WHERE id = $1 RETURNING likes`, [postId]);
+      await client.query("COMMIT");
+      res.json({ id: postId, likes: updateResult.rows[0].likes });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Delete a post (Protected + Ownership Check)
 router.delete("/:id", isAuthenticated, async (req, res, next) => {
   const db = req.app.locals.db;
@@ -334,6 +368,39 @@ router.delete("/:id", isAuthenticated, async (req, res, next) => {
     // For now, removing local fs.unlink since it's a cloudinary URL.
 
     res.json({ message: "Post deleted." });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete a comment if you own the post or the comment
+router.delete("/:postId/comments/:commentId", isAuthenticated, async (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.postId);
+  const commentId = Number(req.params.commentId);
+  const userId = req.session.userId;
+
+  if (!Number.isInteger(postId) || !Number.isInteger(commentId)) {
+    return res.status(400).json({ error: "Invalid ids." });
+  }
+
+  try {
+    const postRes = await db.query("SELECT user_id FROM posts WHERE id = $1", [postId]);
+    const post = postRes.rows[0];
+    if (!post) return res.status(404).json({ error: "Post not found." });
+
+    const commentRes = await db.query("SELECT user_id FROM comments WHERE id = $1 AND post_id = $2", [commentId, postId]);
+    const comment = commentRes.rows[0];
+    if (!comment) return res.status(404).json({ error: "Comment not found." });
+
+    const isOwner = post.user_id === userId;
+    const isCommentAuthor = comment.user_id === userId;
+    if (!isOwner && !isCommentAuthor) {
+      return res.status(403).json({ error: "You do not have permission to delete this comment." });
+    }
+
+    await db.query("DELETE FROM comments WHERE id = $1 AND post_id = $2", [commentId, postId]);
+    res.json({ message: "Comment deleted." });
   } catch (err) {
     next(err);
   }

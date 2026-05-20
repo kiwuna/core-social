@@ -430,6 +430,7 @@ function createPostElement(post) {
   const postElement = document.createElement("article");
   postElement.className = "post";
   postElement.dataset.postId = String(post.id);
+  postElement.dataset.ownerId = String(post.user_id);
 
   const createdAt = post.created_at ? timeAgo(new Date(post.created_at)) : "just now";
   const displayEmoji = post.emoji || "👻";
@@ -1489,15 +1490,19 @@ document.addEventListener("click", async (event) => {
     if (!currentUser) { window.location.href = "login.html"; return; }
     if (pendingPostActions.has(`like-${postId}`)) return;
     pendingPostActions.add(`like-${postId}`);
+    const isLiked = likeBtn.classList.contains("liked");
 
     try {
-      const res = await fetch(`${API_URL}/posts/${postId}/like`, { method: "POST" });
+      const res = await fetch(`${API_URL}/posts/${postId}/like`, {
+        method: isLiked ? "DELETE" : "POST",
+        credentials: "include"
+      });
       if (res.ok) {
         const data = await res.json();
         const count = postElement.querySelector(".likes-count");
         if (count) count.textContent = formatNumber(data.likes);
-        likeBtn.classList.add("liked");
-        showFeedback("Liked!", "success");
+        likeBtn.classList.toggle("liked", !isLiked);
+        showFeedback(isLiked ? "Unliked." : "Liked!", "success");
       } else {
         const err = await res.json();
         showFeedback(err.error || "Error", "error");
@@ -1583,6 +1588,7 @@ async function toggleComments(postId, postElement) {
 
 function renderInlineComments(postId, postElement, comments) {
     const container = postElement.querySelector(".comments-container");
+    const postOwnerId = Number(postElement.dataset.ownerId);
     let html = `<div class="comments-section">`;
     
     comments.forEach(c => {
@@ -1597,6 +1603,7 @@ function renderInlineComments(postId, postElement, comments) {
             <div class="author">
                <span class="${c.is_premium ? 'premium-name-gradient' : ''}">${c.display_name || c.username}</span>
                <span class="comment-date">${formatSocialDate(c.created_at)}</span>
+               ${currentUser && Number(currentUser.id) === postOwnerId ? `<button class="comment-delete-btn" data-comment-id="${c.id}" style="margin-left:auto; background:none; border:none; color:#f87171; cursor:pointer; font-size:12px;">Delete</button>` : ""}
             </div>
             <div class="text">${c.content}</div>
           </div>
@@ -1618,6 +1625,35 @@ function renderInlineComments(postId, postElement, comments) {
     html += `</div>`;
     container.innerHTML = html;
 
+    container.querySelectorAll(".comment-delete-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const commentId = btn.dataset.commentId;
+        try {
+          const res = await fetch(`${API_URL}/posts/${postId}/comments/${commentId}`, {
+            method: "DELETE",
+            credentials: "include"
+          });
+          if (res.ok) {
+            const refreshRes = await fetch(`${API_URL}/posts/${postId}/comments`);
+            const updatedComments = await refreshRes.json();
+            renderInlineComments(postId, postElement, updatedComments);
+            const countEl = postElement.querySelector(".comments-count");
+            if (countEl) {
+              const current = Math.max(0, (parseInt(countEl.textContent.replace(/[^0-9]/g, "")) || 1) - 1);
+              countEl.textContent = formatNumber(current);
+            }
+          } else {
+            const err = await res.json();
+            showFeedback(err.error || "Failed to delete comment", "error");
+          }
+        } catch (err) {
+          showFeedback("Failed to delete comment", "error");
+        }
+      });
+    });
+
     const form = container.querySelector(".comment-form");
     if (form) {
       form.onsubmit = async (e) => {
@@ -1629,6 +1665,7 @@ function renderInlineComments(postId, postElement, comments) {
         try {
           const postRes = await fetch(`${API_URL}/posts/${postId}/comments`, {
             method: "POST",
+            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content })
           });

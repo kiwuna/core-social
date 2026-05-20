@@ -155,10 +155,13 @@ router.post("/", isAuthenticated, upload.single("image"), async (req, res, next)
   }
 
   if (imagePath) {
-    const userRes = await db.query("SELECT is_premium FROM users WHERE id = $1", [userId]);
+    const userRes = await db.query("SELECT is_premium, is_synced FROM users WHERE id = $1", [userId]);
     const user = userRes.rows[0];
     if (!user || !user.is_premium) {
       return res.status(403).json({ error: "Uploading images requires Core Flow." });
+    }
+    if (!user.is_synced) {
+      return res.status(403).json({ error: "Please sync your email in settings to upload images." });
     }
   }
 

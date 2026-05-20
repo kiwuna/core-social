@@ -480,6 +480,33 @@ async function setupPushNotifications() {
   }
 }
 
+function updateKeyboardViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+
+  const keyboardOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  document.documentElement.style.setProperty("--keyboard-offset", `${keyboardOffset}px`);
+
+  const chatShell = document.querySelector(".chat-shell");
+  if (chatShell) {
+    chatShell.classList.toggle("keyboard-open", keyboardOffset > 0);
+  }
+}
+
+function initKeyboardViewportFix() {
+  updateKeyboardViewport();
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateKeyboardViewport);
+    window.visualViewport.addEventListener("scroll", updateKeyboardViewport);
+  }
+
+  window.addEventListener("resize", updateKeyboardViewport);
+  window.addEventListener("orientationchange", () => {
+    setTimeout(updateKeyboardViewport, 50);
+  });
+}
+
 function showWarningModalDirectly() {
   if (!currentUser) return;
   const warningModal = document.getElementById("warningModal");
@@ -2464,6 +2491,7 @@ async function handleFollow(userId, button) {
 (async function init() {
   await fetchCurrentUser();
   await setupPushNotifications();
+  initKeyboardViewportFix();
   
   const searchParams = new URLSearchParams(window.location.search);
   if (searchParams.get("checkout") === "success") {

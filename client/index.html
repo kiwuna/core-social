@@ -31,6 +31,7 @@
       <nav class="nav">
         <a id="navFeed" class="nav-item active" href="#"><span class="ico"><img src="./assets/home.png" width="22" height="22"></span> <span>Feed</span></a>
         <a id="navSearch" class="nav-item" href="#"><span class="ico"><img src="./assets/search.png" width="22" height="22"></span> <span>Search</span></a>
+        <a id="navMessages" class="nav-item" href="#"><span class="ico"><img src="./assets/icons8-chat-48.png" width="22" height="22"></span> <span>Messages</span></a>
         <a id="navEvents" class="nav-item" href="#"><span class="ico"><img src="./assets/community.png" width="22" height="22"></span> <span>Events</span></a>
         <a id="navNotifications" class="nav-item" href="#" style="position: relative;">
           <span class="ico"><img src="./assets/bell.png" width="22" height="22"></span> 
@@ -211,11 +212,22 @@
         </div>
       </section>
 
+      <!-- Messages List View -->
+      <section id="messagesListView" class="feed hidden">
+        <div class="messages-list-container">
+          <div class="search-header">
+            <h2 class="search-title">Messages</h2>
+            <p class="search-subtitle">All your chats in one place</p>
+          </div>
+          <div id="messagesListContent" class="messages-list-results"></div>
+        </div>
+      </section>
+
       <!-- Messages View -->
       <section id="messagesView" class="feed hidden chat-shell">
         <div class="sticky-header" style="flex-shrink: 0;">
           <div class="feed-tabs-container chat-header-row">
-            <button class="back-btn" onclick="MapsTo('profile/' + currentChatUserId)" style="background: none; border: none; color: #fff; cursor: pointer;">
+            <button class="back-btn" onclick="MapsTo('messages')" style="background: none; border: none; color: #fff; cursor: pointer;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:24px; height:24px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
             </button>
             <h2 id="chatUserName" style="font-size: 19px; font-weight: 800; color: #fff;">Chat</h2>

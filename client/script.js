@@ -96,6 +96,8 @@ const pollQuestionInput = document.getElementById("pollQuestion");
 // Views
 const feedView = document.getElementById("feedView");
 const searchView = document.getElementById("searchView");
+const messagesListView = document.getElementById("messagesListView");
+const messagesListContent = document.getElementById("messagesListContent");
 const notificationsView = document.getElementById("notificationsView");
 const notificationsContent = document.getElementById("notificationsContent");
 const messagesView = document.getElementById("messagesView");
@@ -103,6 +105,7 @@ const messagesView = document.getElementById("messagesView");
 // Nav
 const navFeed = document.getElementById("navFeed");
 const navSearch = document.getElementById("navSearch");
+const navMessages = document.getElementById("navMessages");
 const navProfile = document.getElementById("navProfile");
 const navCoreFlow = document.getElementById("navCoreFlow");
 const tabExplore = document.getElementById("tabExplore");
@@ -783,6 +786,7 @@ function switchFeedMode(mode) {
 function hideAllViews() {
   feedView.classList.add("hidden");
   if (searchView) searchView.classList.add("hidden");
+  if (messagesListView) messagesListView.classList.add("hidden");
   profileView.classList.add("hidden");
   if (messagesView) messagesView.classList.add("hidden");
   if (notificationsView) notificationsView.classList.add("hidden");
@@ -814,7 +818,8 @@ window.MapsTo = function(viewPath, push = true) {
       showProfile(id);
       break;
     case 'messages':
-      showMessages(id);
+      if (id) showMessages(id);
+      else showMessagesList();
       break;
     case 'notifications':
       showNotifications();
@@ -1023,6 +1028,86 @@ function showSearchView() {
   navSearch.classList.add("active");
   setMobileNavActive("mobNavSearch");
   setTimeout(() => searchInput && searchInput.focus(), 100);
+}
+
+async function showMessagesList() {
+  hideAllViews();
+  if (messagesListView) messagesListView.classList.remove("hidden");
+  if (navMessages) navMessages.classList.add("active");
+
+  if (!messagesListContent) return;
+
+  messagesListContent.innerHTML = `
+    <div class="notifications-loading">
+      <div class="search-spinner"></div>
+      <span>Loading chats...</span>
+    </div>`;
+
+  try {
+    const res = await fetch("/api/messages/conversations");
+    if (!res.ok) throw new Error("Failed");
+    let chats = await res.json();
+
+    if (!Array.isArray(chats)) chats = [];
+
+    if (!Array.isArray(chats) || chats.length === 0) {
+      // Fallback: build a lightweight chat list from message notifications
+      try {
+        const nres = await fetch("/notifications");
+        if (nres.ok) {
+          const notifications = await nres.json();
+          const seen = new Set();
+          chats = notifications
+            .filter(n => n.type === "message" && n.sender_id && !seen.has(n.sender_id) && (seen.add(n.sender_id) || true))
+            .map(n => ({
+              user_id: n.sender_id,
+              username: n.sender_username,
+              display_name: n.sender_display_name,
+              emoji: n.sender_emoji,
+              avatar_path: n.sender_avatar,
+              last_message: n.message_preview || "",
+              last_message_at: n.created_at
+            }));
+        }
+      } catch {}
+    }
+
+    if (!Array.isArray(chats) || chats.length === 0) {
+      messagesListContent.innerHTML = `
+        <div class="notifications-empty-state">
+          <p>No chats yet</p>
+          <span>Start a conversation from a profile.</span>
+        </div>`;
+      return;
+    }
+
+    messagesListContent.innerHTML = "";
+    chats.forEach((c) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "messages-list-item";
+      const name = c.display_name || c.username || "User";
+      const avatar = c.avatar_path
+        ? `<img src="${c.avatar_path}" alt="${name}" />`
+        : (c.emoji || "👤");
+      const preview = (c.last_message || "").replace(/\s+/g, " ").trim();
+      const time = c.last_message_at ? timeAgo(new Date(c.last_message_at)) : "";
+      row.innerHTML = `
+        <div class="messages-list-avatar">${avatar}</div>
+        <div class="messages-list-body">
+          <div class="messages-list-top">
+            <span class="messages-list-name">${name}</span>
+            <span class="messages-list-time">${time}</span>
+          </div>
+          <div class="messages-list-preview">${preview || "No messages yet"}</div>
+        </div>
+      `;
+      row.addEventListener("click", () => MapsTo(`messages/${c.user_id}`));
+      messagesListContent.appendChild(row);
+    });
+  } catch (err) {
+    messagesListContent.innerHTML = `<div style="padding: 24px; color: var(--muted);">Could not load chats right now.</div>`;
+  }
 }
 
 function replayStaggeredAnimations(root, selector) {
@@ -1648,6 +1733,7 @@ logoutBtn.addEventListener("click", async () => {
 
 if (navFeed) navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
 if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo('search'); });
+if (navMessages) navMessages.addEventListener("click", (e) => { e.preventDefault(); MapsTo('messages'); });
 if (document.getElementById("navNotifications")) document.getElementById("navNotifications").addEventListener("click", (e) => { e.preventDefault(); MapsTo('notifications'); });
 if (document.getElementById("btnClearAll")) document.getElementById("btnClearAll").addEventListener("click", () => clearAllNotifications());
 if (navProfile) navProfile.addEventListener("click", (e) => { 
@@ -1746,6 +1832,7 @@ document.addEventListener("click", async (event) => {
 // Sticky Header Scroll Logic
 const stickyHeader = document.getElementById("stickyHeader");
 let lastScrollTop = 0;
+let lastFeedScrollTop = 0;
 
 let isHeaderHidden = false;
 
@@ -1756,6 +1843,21 @@ function handleScroll() {
 }
 
 window.addEventListener("scroll", handleScroll);
+
+const feedScrollEl = document.getElementById("feedView");
+if (feedScrollEl) {
+  feedScrollEl.addEventListener("scroll", () => {
+    const st = feedScrollEl.scrollTop || 0;
+    const delta = st - lastFeedScrollTop;
+    const nearTop = st < 28;
+    if (nearTop || delta < -8) {
+      feedScrollEl.classList.remove("composer-hidden");
+    } else if (delta > 8) {
+      feedScrollEl.classList.add("composer-hidden");
+    }
+    lastFeedScrollTop = st;
+  }, { passive: true });
+}
 
 async function toggleComments(postId, postElement) {
   const container = postElement.querySelector(".comments-container");
@@ -2196,6 +2298,7 @@ if (removeBannerBtn) {
 // Navigation Listeners
 if (navFeed) navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo('feed'); });
 if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo('search'); });
+if (navMessages) navMessages.addEventListener("click", (e) => { e.preventDefault(); MapsTo('messages'); });
 if (navProfile) navProfile.addEventListener("click", (e) => { 
   e.preventDefault(); 
   if (currentUser) MapsTo('profile/' + currentUser.id); 
@@ -2633,10 +2736,14 @@ function initSocket() {
 
 async function showMessages(friendId) {
   if (!currentUser) return window.location.href = "login.html";
+  if (!friendId || Number.isNaN(Number(friendId))) {
+    showMessagesList();
+    return;
+  }
   
   if (!socket) initSocket();
   hideAllViews();
-  currentChatUserId = friendId;
+  currentChatUserId = Number(friendId);
   if (messagesView) messagesView.classList.remove("hidden");
   
   try {

@@ -90,6 +90,23 @@ const closePollButton = document.getElementById("closePollButton");
 const addPollOptionButton = document.getElementById("addPollOption");
 const pollOptionsContainer = document.getElementById("pollOptionsContainer");
 const pollQuestionInput = document.getElementById("pollQuestion");
+const feedView = document.getElementById("feedView");
+const searchView = document.getElementById("searchView");
+const messagesView = document.getElementById("messagesView");
+const notificationsView = document.getElementById("notificationsView");
+const navFeed = document.getElementById("navFeed");
+const navSearch = document.getElementById("navSearch");
+const navNotifications = document.getElementById("navNotifications");
+const navProfile = document.getElementById("navProfile");
+const mobNavFeed = document.getElementById("mobNavFeed");
+const mobNavSearch = document.getElementById("mobNavSearch");
+const mobNavNotifications = document.getElementById("mobNavNotifications");
+const mobNavProfile = document.getElementById("mobNavProfile");
+const unreadBadge = document.getElementById("unreadBadge");
+const mobUnreadBadge = document.getElementById("mobUnreadBadge");
+const logoutBtn = document.getElementById("logoutBtn");
+const loginLink = document.getElementById("loginLink");
+const messagesContainer = document.getElementById("chatMessages");
 
 let currentUser = null;
 
@@ -109,6 +126,115 @@ async function fetchCurrentUser() {
     window.location.href = "login.html";
     return null;
   }
+}
+
+function showFeedback(message, type = "info") {
+  if (!feedbackMessage) return;
+  feedbackMessage.textContent = message;
+  feedbackMessage.dataset.type = type;
+  feedbackMessage.style.opacity = "1";
+  clearTimeout(window.__feedbackTimer);
+  window.__feedbackTimer = setTimeout(() => {
+    feedbackMessage.style.opacity = "0";
+  }, 2500);
+}
+
+function updateNotificationBadge(hasUnread) {
+  const display = hasUnread ? "block" : "none";
+  if (unreadBadge) unreadBadge.style.display = display;
+  if (mobUnreadBadge) mobUnreadBadge.style.display = display;
+}
+
+async function checkUnreadNotifications() {
+  try {
+    const res = await fetch("/notifications", { credentials: "include" });
+    if (!res.ok) return;
+    const notifications = await res.json();
+    updateNotificationBadge(Array.isArray(notifications) && notifications.some((n) => !n.is_read));
+  } catch (error) {
+    console.error("Failed to check notifications:", error);
+  }
+}
+
+function hideAllViews() {
+  [feedView, searchView, profileView, notificationsView, messagesView].forEach((view) => {
+    if (view) view.classList.add("hidden");
+  });
+}
+
+function setActiveNav(activeId) {
+  [navFeed, navSearch, navNotifications, navProfile, mobNavFeed, mobNavSearch, mobNavNotifications, mobNavProfile].forEach((item) => {
+    if (!item) return;
+    item.classList.remove("active");
+  });
+
+  const map = {
+    feed: [navFeed, mobNavFeed],
+    search: [navSearch, mobNavSearch],
+    notifications: [navNotifications, mobNavNotifications],
+    profile: [navProfile, mobNavProfile]
+  };
+  (map[activeId] || []).forEach((item) => item && item.classList.add("active"));
+}
+
+function showFeed() {
+  hideAllViews();
+  if (feedView) feedView.classList.remove("hidden");
+  setActiveNav("feed");
+}
+
+function showSearch() {
+  hideAllViews();
+  if (searchView) searchView.classList.remove("hidden");
+  setActiveNav("search");
+}
+
+function showNotifications() {
+  hideAllViews();
+  if (notificationsView) notificationsView.classList.remove("hidden");
+  updateNotificationBadge(false);
+  setActiveNav("notifications");
+}
+
+function showProfile(userId = currentUser?.id) {
+  hideAllViews();
+  if (profileView) profileView.classList.remove("hidden");
+  setActiveNav("profile");
+  if (userId && typeof loadProfile === "function") loadProfile(userId);
+}
+
+async function loadProfile(userId) {
+  if (!profileContent) return;
+  profileContent.innerHTML = `<div style="padding: 24px; color: var(--muted);">Loading profile...</div>`;
+  try {
+    const res = await fetch(`/auth/users/${userId}`);
+    if (!res.ok) throw new Error("Profile not found");
+    const data = await res.json();
+    const user = data.user;
+    profileContent.innerHTML = `
+      <div style="padding: 24px;">
+        <h2 style="margin: 0 0 8px; color: #fff;">${user.display_name || user.username}</h2>
+        <p style="margin: 0; color: var(--muted);">@${user.username}</p>
+        <p style="margin-top: 16px; color: #ddd;">${user.bio || ""}</p>
+      </div>
+    `;
+  } catch (error) {
+    profileContent.innerHTML = `<div style="padding: 24px; color: var(--muted);">Unable to load profile.</div>`;
+  }
+}
+
+function MapsTo(path, pushState = true) {
+  if (!path) return;
+  if (typeof path === "string" && path.startsWith("profile/")) {
+    const userId = path.split("/")[1];
+    showProfile(userId);
+    if (pushState) window.history.pushState({ viewPath: path }, "", `#${path}`);
+    return;
+  }
+  if (path === "feed") showFeed();
+  if (path === "search") showSearch();
+  if (path === "notifications") showNotifications();
+  if (pushState) window.history.pushState({ viewPath: path }, "", `#${path}`);
 }
 
 (async function init() {
@@ -138,6 +264,22 @@ async function fetchCurrentUser() {
   checkUnreadNotifications();
   setInterval(checkUnreadNotifications, 30000); // Check every 30s
 })();
+
+if (navFeed) navFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo("feed"); });
+if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo("search"); });
+if (navNotifications) navNotifications.addEventListener("click", (e) => { e.preventDefault(); MapsTo("notifications"); });
+if (navProfile) navProfile.addEventListener("click", (e) => { e.preventDefault(); MapsTo(`profile/${currentUser?.id || ""}`); });
+if (mobNavFeed) mobNavFeed.addEventListener("click", (e) => { e.preventDefault(); MapsTo("feed"); });
+if (mobNavSearch) mobNavSearch.addEventListener("click", (e) => { e.preventDefault(); MapsTo("search"); });
+if (mobNavNotifications) mobNavNotifications.addEventListener("click", (e) => { e.preventDefault(); MapsTo("notifications"); });
+if (mobNavProfile) mobNavProfile.addEventListener("click", (e) => { e.preventDefault(); MapsTo(`profile/${currentUser?.id || ""}`); });
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/auth/logout", { method: "POST", credentials: "include" });
+    window.location.href = "login.html";
+  });
+}
 
 // ═══════════════════════════════════════
 // Messaging Logic

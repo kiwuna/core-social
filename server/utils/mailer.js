@@ -1,23 +1,8 @@
-const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS) || 10000;
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
-
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  requireTLS: true,
-  connectionTimeout: EMAIL_TIMEOUT_MS,
-  greetingTimeout: EMAIL_TIMEOUT_MS,
-  socketTimeout: EMAIL_TIMEOUT_MS,
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS
-  }
-});
+const EMAIL_FROM = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 
 function withTimeout(promise, timeoutMs, label) {
   let timer;
@@ -31,51 +16,70 @@ function withTimeout(promise, timeoutMs, label) {
   ]);
 }
 
-/**
- * Generic function to send an email
- */
 async function sendEmail(to, subject, html) {
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    throw new Error("Missing Gmail credentials. Set EMAIL_USER and EMAIL_PASS in environment variables.");
+  if (!SENDGRID_API_KEY) {
+    throw new Error("Missing HTTPS mail credentials. Set SENDGRID_API_KEY in environment variables.");
   }
 
-  const mailOptions = {
-    from: EMAIL_USER,
-    to,
-    subject,
-    html
+  if (!EMAIL_FROM) {
+    throw new Error("Missing EMAIL_FROM or EMAIL_USER. Set a verified sender address in environment variables.");
+  }
+
+  const payload = {
+    personalizations: [
+      {
+        to: [{ email: to }],
+        subject
+      }
+    ],
+    from: { email: EMAIL_FROM },
+    content: [
+      {
+        type: "text/html",
+        value: html
+      }
+    ]
   };
 
   try {
-    const info = await withTimeout(
-      transporter.sendMail(mailOptions),
+    const response = await withTimeout(
+      fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SENDGRID_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }),
       EMAIL_TIMEOUT_MS,
-      "Gmail SMTP email send"
+      "HTTPS email send"
     );
-    console.log("Email sent successfully via Gmail SMTP:", info.messageId);
-    return info;
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      const error = new Error(`HTTPS email send failed with status ${response.status}${responseText ? `: ${responseText}` : ""}`);
+      error.responseCode = response.status;
+      error.response = responseText;
+      throw error;
+    }
+
+    console.log("Email sent successfully via HTTPS mail API:", response.status);
+    return { statusCode: response.status };
   } catch (error) {
     const detailParts = [error.message];
-    if (error.code) console.error("Email send code:", error.code);
-    if (error.response) {
-      console.error("Email send response:", error.response);
-      detailParts.push(String(error.response));
-    }
     if (error.responseCode) {
       console.error("Email send response code:", error.responseCode);
       detailParts.push(`code=${error.responseCode}`);
     }
-    if (error.code) {
-      detailParts.push(`error=${error.code}`);
+    if (error.response) {
+      console.error("Email send response:", error.response);
+      detailParts.push(String(error.response));
     }
     console.error("Email send error:", detailParts.join(" | "));
     throw error;
   }
 }
 
-/**
- * Sends a clean, dark-mode CORE themed verification email
- */
 async function sendVerificationEmail(to, code) {
   const subject = `Your CORE Sync Code: ${code}`;
   const html = `
@@ -102,9 +106,6 @@ async function sendVerificationEmail(to, code) {
   return sendEmail(to, subject, html);
 }
 
-/**
- * Sends a clean, dark-mode CORE themed unlink email
- */
 async function sendUnlinkEmail(to, code) {
   const subject = `Your CORE Unlink Code: ${code}`;
   const html = `

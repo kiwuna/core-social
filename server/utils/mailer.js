@@ -6,7 +6,12 @@ const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  connectionTimeout: EMAIL_TIMEOUT_MS,
+  greetingTimeout: EMAIL_TIMEOUT_MS,
+  socketTimeout: EMAIL_TIMEOUT_MS,
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASS
@@ -50,6 +55,9 @@ async function sendEmail(to, subject, html) {
     return info;
   } catch (error) {
     console.error("Email send error:", error.message);
+    if (error.code) console.error("Email send code:", error.code);
+    if (error.response) console.error("Email send response:", error.response);
+    if (error.responseCode) console.error("Email send response code:", error.responseCode);
     throw error;
   }
 }

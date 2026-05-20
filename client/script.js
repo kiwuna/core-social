@@ -408,6 +408,7 @@ async function registerServiceWorker() {
 
 async function subscribeToPush() {
   const registration = await registerServiceWorker();
+  await navigator.serviceWorker.ready;
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
     throw new Error("Notification permission was denied.");
@@ -417,7 +418,12 @@ async function subscribeToPush() {
   if (!keyRes.ok) throw new Error("Missing push public key.");
   const { publicKey } = await keyRes.json();
 
-  let subscription = await registration.pushManager.getSubscription();
+  let subscription = null;
+  try {
+    subscription = await registration.pushManager.getSubscription();
+  } catch (error) {
+    console.warn("Push subscription lookup failed, creating new subscription:", error.message);
+  }
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,

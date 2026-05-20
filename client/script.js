@@ -435,6 +435,18 @@ async function subscribeToPush() {
   return subscription;
 }
 
+async function setupPushNotifications() {
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return;
+  }
+
+  try {
+    await registerServiceWorker();
+  } catch (error) {
+    console.warn("Push setup skipped:", error.message);
+  }
+}
+
 function showWarningModalDirectly() {
   if (!currentUser) return;
   const warningModal = document.getElementById("warningModal");
@@ -2417,6 +2429,7 @@ async function handleFollow(userId, button) {
 
 (async function init() {
   await fetchCurrentUser();
+  await setupPushNotifications();
   
   const searchParams = new URLSearchParams(window.location.search);
   if (searchParams.get("checkout") === "success") {

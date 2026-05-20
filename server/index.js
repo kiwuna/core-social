@@ -12,6 +12,7 @@ const notificationsRouter = require("./routes/notifications");
 const syncRouter = require("./routes/sync");
 const adminRouter = require("./routes/admin");
 const messagesRouter = require("./routes/messages");
+const { router: pushRouter, sendMessagePush } = require("./routes/push");
 const errorHandler = require("./middleware/errorHandler");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -73,6 +74,19 @@ io.on("connection", (socket) => {
             receiver_id
           });
         }
+      }
+
+      // Push notification fan-out for offline/mobile users
+      try {
+        await sendMessagePush(db, receiver_id, {
+          title: "New message",
+          body: content,
+          url: `/messages/${sender_id}`,
+          icon: "/assets/CoreLogo.png",
+          badge: "/assets/CoreLogo.png"
+        });
+      } catch (pushErr) {
+        console.error("Push notification error:", pushErr.message);
       }
     } catch (err) {
       console.error("Error saving message", err);
@@ -180,6 +194,7 @@ app.use("/feed", feedRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api", syncRouter);
+app.use("/api/push", pushRouter);
 
 app.use("/api/admin", adminRouter);
 

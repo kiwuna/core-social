@@ -78,6 +78,8 @@ const settingsBio = document.getElementById("settingsBio");
 const settingsUserEmoji = document.getElementById("settingsUserEmoji");
 const settingsTabTitle = document.getElementById("settingsTabTitle");
 const feedbackMessage = document.getElementById("feedbackMessage");
+const enablePushBtn = document.getElementById("enablePushBtn");
+const testPushBtn = document.getElementById("testPushBtn");
 const sendButton = postForm ? postForm.querySelector(".send") : null;
 const imageInput = document.getElementById("imageInput");
 const pickImageButton = document.getElementById("pickImageButton");
@@ -388,6 +390,49 @@ async function fetchCurrentUser() {
     currentUser = null;
     updateAuthUI();
   }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("Service workers are not supported in this browser.");
+  }
+  return navigator.serviceWorker.register("/sw.js");
+}
+
+async function subscribeToPush() {
+  const registration = await registerServiceWorker();
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    throw new Error("Notification permission was denied.");
+  }
+
+  const keyRes = await fetch("/api/push/public-key", { credentials: "include" });
+  if (!keyRes.ok) throw new Error("Missing push public key.");
+  const { publicKey } = await keyRes.json();
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+  }
+
+  await fetch("/api/push/subscribe", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscription)
+  });
+
+  return subscription;
 }
 
 function showWarningModalDirectly() {
@@ -2530,6 +2575,37 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+if (enablePushBtn) {
+  enablePushBtn.addEventListener("click", async () => {
+    try {
+      await subscribeToPush();
+      showFeedback("Push notifications enabled.", "success");
+    } catch (error) {
+      console.error(error);
+      showFeedback(error.message || "Failed to enable push notifications.", "error");
+    }
+  });
+}
+
+if (testPushBtn) {
+  testPushBtn.addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/push/test", {
+        method: "POST",
+        credentials: "include"
+      });
+      if (res.ok) {
+        showFeedback("Test notification sent.", "success");
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Failed to send test notification.", "error");
+      }
+    } catch (error) {
+      showFeedback("Failed to send test notification.", "error");
+    }
+  });
+}
 
 
 

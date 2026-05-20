@@ -4,7 +4,6 @@ const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const nodemailer = require("nodemailer");
 const { isAuthenticated } = require("../middleware/auth");
 
 const { v2: cloudinary } = require("cloudinary");

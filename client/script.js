@@ -361,9 +361,6 @@ function updateAuthUI() {
     logoutBtn.classList.add("hidden");
     loginLink.classList.remove("hidden");
   }
-  if (typeof checkSyncLock === 'function') {
-    checkSyncLock();
-  }
 }
 
 async function fetchCurrentUser() {
@@ -2334,142 +2331,7 @@ async function handleFollow(userId, button) {
 }
 
 // ═══════════════════════════════════════
-// Global Email Sync Lock Overlay Logic
-// ═══════════════════════════════════════
 
-window.checkSyncLock = function() {
-  const overlay = document.getElementById("syncLockOverlay");
-  if (!overlay) return;
-  if (currentUser) {
-    const isSynced = !!(currentUser.isSynced || currentUser.is_synced || currentUser.is_verified);
-    if (!isSynced) {
-      overlay.style.display = "flex";
-      // Ensure other modals are closed
-      if (settingsModal) settingsModal.classList.remove("show");
-    } else {
-      overlay.style.display = "none";
-    }
-  } else {
-    overlay.style.display = "none";
-  }
-};
-
-const btnLockSendCode = document.getElementById("btnLockSendCode");
-const lockSyncEmailInput = document.getElementById("lockSyncEmailInput");
-const btnLockVerify = document.getElementById("btnLockVerify");
-const lockSyncCodeInput = document.getElementById("lockSyncCodeInput");
-const btnLockCancel = document.getElementById("btnLockCancel");
-const lockSyncLogoutBtn = document.getElementById("lockSyncLogoutBtn");
-
-const lockRequestForm = document.getElementById("lockRequestForm");
-const lockVerifyForm = document.getElementById("lockVerifyForm");
-const lockSyncEmailAddress = document.getElementById("lockSyncEmailAddress");
-
-if (btnLockSendCode) {
-  btnLockSendCode.addEventListener("click", async (e) => {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    const emailInputEl = document.getElementById("lockSyncEmailInput");
-    const emailValue = emailInputEl ? emailInputEl.value.trim() : "";
-    
-    if (!emailValue || !emailValue.includes("@")) {
-      showFeedback("Please enter a valid email address.", "error");
-      return;
-    }
-
-    btnLockSendCode.disabled = true;
-    btnLockSendCode.textContent = "...";
-
-    try {
-      const res = await fetch("/api/sync-request", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailValue })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.isSynced) {
-          currentUser.isSynced = true;
-          currentUser.is_verified = true;
-          currentUser.email = emailValue;
-          updateAuthUI();
-          showFeedback(data.message || "Email verified!", "success");
-          return;
-        }
-        lockSyncEmailAddress.textContent = emailValue;
-        lockRequestForm.style.display = "none";
-        lockVerifyForm.style.display = "block";
-        showFeedback(data.message || "Verification code requested!", "success");
-      } else {
-        const err = await res.json();
-        showFeedback(err.error || "Failed to send code.", "error");
-      }
-    } catch (err) {
-      showFeedback("Error connecting to server.", "error");
-    } finally {
-      btnLockSendCode.disabled = false;
-      btnLockSendCode.textContent = "Send Verification Code";
-    }
-  });
-}
-
-if (btnLockVerify) {
-  btnLockVerify.addEventListener("click", async () => {
-    const email = lockSyncEmailAddress.textContent;
-    const code = lockSyncCodeInput.value.trim();
-
-    if (code.length !== 6) {
-      showFeedback("Please enter the 6-digit code.", "error");
-      return;
-    }
-
-    btnLockVerify.disabled = true;
-    btnLockVerify.textContent = "...";
-
-    try {
-      const res = await fetch("/api/sync-verify", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        currentUser.isSynced = true;
-        currentUser.is_verified = true;
-        currentUser.email = lockSyncEmailAddress.textContent;
-        
-        updateAuthUI();
-        showFeedback("Email synced & Verified!", "success");
-      } else {
-        const err = await res.json();
-        showFeedback(err.error || "Verification failed.", "error");
-      }
-    } catch (err) {
-      showFeedback("Error connecting to server.", "error");
-    } finally {
-      btnLockVerify.disabled = false;
-      btnLockVerify.textContent = "Verify Code";
-    }
-  });
-}
-
-if (btnLockCancel) {
-  btnLockCancel.addEventListener("click", () => {
-    lockVerifyForm.style.display = "none";
-    lockRequestForm.style.display = "block";
-    lockSyncCodeInput.value = "";
-  });
-}
-
-if (lockSyncLogoutBtn) {
-  lockSyncLogoutBtn.addEventListener("click", async () => {
-    const res = await fetch("/auth/logout", { method: "POST" });
-    if (res.ok) window.location.reload();
-  });
-}
 
 (async function init() {
   await fetchCurrentUser();
@@ -2631,6 +2493,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
 
 
 

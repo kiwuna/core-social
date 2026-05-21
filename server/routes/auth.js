@@ -250,9 +250,6 @@ router.post("/upload-avatar", isAuthenticated, uploadAvatar.single("avatar"), as
     if (!user.is_premium) {
       return res.status(403).json({ error: "Custom avatars require Core Flow." });
     }
-    if (!user.is_synced) {
-      return res.status(403).json({ error: "Please sync your email to use premium features." });
-    }
 
     // req.file.path contains the Cloudinary URL
     const avatarPath = req.file.path; 
@@ -277,9 +274,6 @@ router.post("/upload-banner", isAuthenticated, uploadBanner.single("banner"), as
     if (!user) return res.status(404).json({ error: "User not found." });
     if (!user.is_premium) {
       return res.status(403).json({ error: "Custom banners require Core Flow." });
-    }
-    if (!user.is_synced) {
-      return res.status(403).json({ error: "Please sync your email to use premium features." });
     }
 
     const bannerPath = req.file.path;

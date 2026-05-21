@@ -74,8 +74,8 @@
             <div style="width: 40px; display: none;" id="headerSpacer"></div>
           </div>
 
-          <!-- Composer -->
-          <div class="composer-container feed-animate-composer">
+          <!-- Composer (desktop: inside sticky header) -->
+          <div class="composer-container feed-animate-composer composer-desktop">
             <form id="postForm" class="composer" autocomplete="off">
               <div class="composer-top">
                 <span id="userEmojiMini" class="mini-avatar">👻</span>
@@ -129,6 +129,8 @@
         </div>
 
         <div id="feedScrollArea" class="feed-content feed-animate-posts">
+          <!-- On mobile, the composer-container is moved here by JS so it scrolls with the feed -->
+          <div id="mobileComposerSlot"></div>
           <!-- Feed Posts Wrapper -->
           <div class="feed-posts-wrapper" style="padding-top: 0;">
             <div id="feedPosts" class="feed-posts-list"></div>
@@ -202,9 +204,15 @@
           <div class="notifications-header">
             <div class="notifications-header-text">
               <h2 class="notifications-title">Notifications</h2>
-              <p class="notifications-subtitle">Likes, follows, comments, and messages</p>
+              <p class="notifications-subtitle" id="notificationsSubtitle">Likes, follows, comments, and messages</p>
             </div>
-            <button class="btn-clear-all" id="btnClearAll">Clear All</button>
+            <div class="notifications-header-actions">
+              <button class="btn-reports-folder hidden" id="btnReportsFolder">
+                <span class="ico">📁</span>
+                <span>Reports</span>
+              </button>
+              <button class="btn-clear-all" id="btnClearAll">Clear All</button>
+            </div>
           </div>
           <div id="notificationsContent" class="notifications-results">
             <!-- Notifications injected here -->

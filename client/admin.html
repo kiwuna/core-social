@@ -707,11 +707,6 @@
             <input type="checkbox" id="editIsPremium" />
             <label for="editIsPremium">Core Flow Premium</label>
           </div>
-
-          <div class="admin-checkbox-row">
-            <input type="checkbox" id="editIsSynced" />
-            <label for="editIsSynced">Synced & Verified Email</label>
-          </div>
         </div>
 
         <div class="admin-modal-footer">
@@ -984,7 +979,6 @@
         else document.getElementById("editSuspension").value = "30";
       }
       document.getElementById("editIsPremium").checked = !!user.is_premium;
-      document.getElementById("editIsSynced").checked = !!user.is_synced;
 
       // Handle inappropriate media deletion row visibility
       document.getElementById("editRemoveAvatar").checked = false;
@@ -1024,7 +1018,6 @@
       const role = document.getElementById("editRole").value;
       const suspensionDuration = document.getElementById("editSuspension").value;
       const is_premium = document.getElementById("editIsPremium").checked ? 1 : 0;
-      const is_synced = document.getElementById("editIsSynced").checked;
 
       const removeAvatar = document.getElementById("editRemoveAvatar").checked;
       const removeBanner = document.getElementById("editRemoveBanner").checked;
@@ -1037,7 +1030,6 @@
             role,
             suspensionDuration,
             is_premium,
-            is_synced,
             removeAvatar,
             removeBanner
           })

@@ -326,6 +326,66 @@ body {
   transition: all 0.2s;
 }
 .action-delete:hover { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
+
+.action-delete-admin {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.action-delete-admin:hover { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
+
+.action-report {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+
+.post-menu {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  z-index: 100;
+  min-width: 160px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.post-menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.post-menu-item:hover {
+  background: var(--accent-muted);
+  color: var(--text);
+}
+
 .post {
   background: var(--panel);
   border-radius: var(--radius-xl);
@@ -2422,6 +2482,27 @@ body {
 
   #feedView .sticky-header { top: 0 !important; }
 
+  /* On mobile the composer is moved into the scroll area — disable sticky-header composer animations */
+  #feedView.composer-hidden .composer-container {
+    opacity: 1 !important;
+    transform: none !important;
+    max-height: none !important;
+    margin: initial !important;
+    padding-top: initial !important;
+    padding-bottom: initial !important;
+    pointer-events: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Composer slot padding on mobile */
+  #mobileComposerSlot {
+    padding: 12px 12px 0;
+  }
+
+  #mobileComposerSlot .composer-container {
+    padding: 0 0 12px;
+  }
+
   #feedScrollArea {
     flex: none;
     min-height: auto;
@@ -3098,6 +3179,12 @@ body {
   padding: 0 4px;
 }
 
+.notifications-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .btn-clear-all {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--panel-border);
@@ -3115,6 +3202,32 @@ body {
   color: #f43f5e;
   border-color: rgba(244, 63, 94, 0.2);
 }
+
+.btn-reports-folder {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-reports-folder:hover {
+  background: rgba(255, 215, 0, 0.1);
+  color: #ffd700;
+  border-color: rgba(255, 215, 0, 0.2);
+}
+
+.btn-reports-folder .ico {
+  font-size: 14px;
+}
+
 .notification-item.unread {
   background: rgba(59, 130, 246, 0.08);
   border-color: rgba(59, 130, 246, 0.25);
@@ -3351,6 +3464,6 @@ body {
   }
 
   html.keyboard-open #messagesView .chat-input-area {
-    bottom: var(--keyboard-offset);
+    bottom: calc(var(--vv-height) - var(--vv-offset-top) - var(--safe-bottom));
   }
 }

@@ -69,6 +69,17 @@ const initDb = async () => {
     await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS acknowledged_warnings INTEGER DEFAULT 0');
     await runAlter('ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMP WITH TIME ZONE DEFAULT NULL');
 
+    // Create reports table
+    await runAlter(`
+      CREATE TABLE IF NOT EXISTS reports (
+        id SERIAL PRIMARY KEY,
+        post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+        reporter_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(post_id, reporter_id)
+      )
+    `);
+
     // Posts table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS posts (

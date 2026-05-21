@@ -131,7 +131,7 @@ router.post("/warn/:id", isAdmin, async (req, res, next) => {
 // Admin option to manually edit a user profile, role, or suspend account for a duration
 router.post("/users/:id/edit", isAdmin, async (req, res, next) => {
   const targetId = parseInt(req.params.id);
-  const { role, suspensionDuration, is_premium, is_synced, removeAvatar, removeBanner } = req.body;
+  const { role, suspensionDuration, is_premium, removeAvatar, removeBanner } = req.body;
   const db = req.app.locals.db;
 
   try {
@@ -155,17 +155,13 @@ router.post("/users/:id/edit", isAdmin, async (req, res, next) => {
         role = $1,
         is_banned = $2,
         suspended_until = $3,
-        is_premium = $4,
-        is_synced = $5,
-        is_verified = $6
-      WHERE id = $7
+        is_premium = $4
+      WHERE id = $5
     `, [
       role || "user",
       is_banned,
       suspended_until,
       is_premium === undefined ? 0 : parseInt(is_premium),
-      is_synced === undefined ? false : !!is_synced,
-      is_synced === undefined ? false : !!is_synced,
       targetId
     ]);
 

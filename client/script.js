@@ -284,27 +284,23 @@ function updateAuthUI() {
     const isPremium = !!currentUser.is_premium;
 
     if (avatarUploadArea) {
-      avatarUploadArea.classList.toggle('locked', !isPremium || !currentUser.isSynced);
-      avatarUploadArea.style.pointerEvents = (isPremium && currentUser.isSynced) ? 'auto' : 'none';
+      avatarUploadArea.classList.toggle('locked', !isPremium);
+      avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
     }
     if (avatarLockedMsg) {
-      avatarLockedMsg.classList.toggle('hidden', isPremium && currentUser.isSynced);
-      if (isPremium && !currentUser.isSynced) {
-      avatarLockedMsg.innerHTML = '<span>??</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
-      } else if (!isPremium) {
+      avatarLockedMsg.classList.toggle('hidden', isPremium);
+      if (!isPremium) {
       avatarLockedMsg.innerHTML = '<span>??</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
       }
     }
 
     if (bannerUploadArea) {
-      bannerUploadArea.classList.toggle('locked', !isPremium || !currentUser.isSynced);
-      bannerUploadArea.style.pointerEvents = (isPremium && currentUser.isSynced) ? 'auto' : 'none';
+      bannerUploadArea.classList.toggle('locked', !isPremium);
+      bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
     }
     if (bannerLockedMsg) {
-      bannerLockedMsg.classList.toggle('hidden', isPremium && currentUser.isSynced);
-      if (!currentUser.isSynced) {
-      bannerLockedMsg.innerHTML = '<span>??</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
-      } else {
+      bannerLockedMsg.classList.toggle('hidden', isPremium);
+      if (!isPremium) {
       bannerLockedMsg.innerHTML = '<span>??</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
       }
     }
@@ -628,6 +624,9 @@ function createPostElement(post) {
         0
       </span>
       ${isOwner ? '<button class="action-delete" style="margin-left:auto;">Delete</button>' : ""}
+      ${!isOwner && currentUser && (currentUser.role === 'admin' || currentUser.role === 'ceo' || currentUser.role === 'mod') 
+        ? '<button class="action-delete-admin" style="margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;font-size:12px;font-weight:700;">Delete</button>' 
+        : ''}
     </footer>
     <div class="comments-container hidden"></div>
   `;
@@ -1126,6 +1125,16 @@ async function showNotifications() {
   setMobileNavActive("mobNavNotifications");
   replayStaggeredAnimations(notificationsView, ".notifications-header, .notifications-results");
 
+  // Show reports folder only for admins/mods
+  const btnReportsFolder = document.getElementById("btnReportsFolder");
+  if (btnReportsFolder) {
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'ceo' || currentUser.role === 'mod')) {
+      btnReportsFolder.classList.remove("hidden");
+    } else {
+      btnReportsFolder.classList.add("hidden");
+    }
+  }
+
   notificationsContent.innerHTML = `
     <div class="notifications-loading">
       <div class="search-spinner"></div>
@@ -1165,6 +1174,11 @@ async function showNotifications() {
       else if (n.type === 'warning') { 
         text = "You received a warning"; 
         icon = "⚠️";
+        isSystem = true;
+      }
+      else if (n.type === 'report') { 
+        text = "reported a post"; 
+        icon = "🚩";
         isSystem = true;
       }
 
@@ -1249,6 +1263,73 @@ async function clearAllNotifications() {
       showFeedback("Failed to clear inbox", "error");
     }
   });
+}
+
+async function showReportsFolder() {
+  hideAllViews();
+  notificationsView.classList.remove("hidden");
+  if (navNotifications) navNotifications.classList.add("active");
+  setMobileNavActive("mobNavNotifications");
+  replayStaggeredAnimations(notificationsView, ".notifications-header, .notifications-results");
+
+  const subtitle = document.getElementById("notificationsSubtitle");
+  if (subtitle) subtitle.textContent = "Reports from other users";
+
+  notificationsContent.innerHTML = `
+    <div class="notifications-loading">
+      <div class="search-spinner"></div>
+      <span>Loading reports...</span>
+    </div>`;
+  
+  try {
+    const res = await fetch("/notifications/reports");
+    const reports = await res.json();
+    
+    if (reports.length === 0) {
+      notificationsContent.innerHTML = `
+        <div class="notifications-empty-state">
+          <div class="notifications-empty-icon"><span style="font-size:48px;">📁</span></div>
+          <p>No reports yet</p>
+          <span>Reports will appear here when users flag content.</span>
+        </div>`;
+      return;
+    }
+
+    notificationsContent.innerHTML = "";
+    replayStaggeredAnimations(notificationsView, ".notifications-results");
+    reports.forEach((r, index) => {
+      const el = document.createElement("div");
+      el.className = `notification-item ${r.is_read ? '' : 'unread'}`;
+      el.style.animationDelay = `${Math.min(index * 0.05, 0.4)}s`;
+      el.dataset.id = r.id;
+      
+      el.innerHTML = `
+        <div class="notification-item-avatar mini-avatar" style="background:rgba(239,68,68,0.1);color:#ef4444">
+          🚩
+        </div>
+        <div class="notification-item-body">
+          <div class="notification-item-title-row">
+            <span class="notification-item-name">${r.reporter_display_name || r.reporter_username}</span>
+            <span class="notification-item-action">reported a post</span>
+          </div>
+          ${r.post_content ? `<p class="notification-item-preview">${r.post_content}</p>` : ""}
+          <span class="notification-item-time">${timeAgo(new Date(r.created_at))}</span>
+        </div>
+        <div class="notification-item-icon">🚩</div>
+      `;
+      
+      el.onclick = (e) => {
+        if (e.target.classList.contains('notification-swipe-action')) return;
+        if (r.post_id) {
+          MapsTo('post/' + r.post_id);
+        }
+      };
+      
+      notificationsContent.appendChild(el);
+    });
+  } catch (err) {
+    notificationsContent.innerHTML = `<div style="padding: 24px; color: var(--muted);">Could not load reports right now.</div>`;
+  }
 }
 
 // Custom Confirmation Modal Logic
@@ -1736,6 +1817,7 @@ if (navSearch) navSearch.addEventListener("click", (e) => { e.preventDefault(); 
 if (navMessages) navMessages.addEventListener("click", (e) => { e.preventDefault(); MapsTo('messages'); });
 if (document.getElementById("navNotifications")) document.getElementById("navNotifications").addEventListener("click", (e) => { e.preventDefault(); MapsTo('notifications'); });
 if (document.getElementById("btnClearAll")) document.getElementById("btnClearAll").addEventListener("click", () => clearAllNotifications());
+if (document.getElementById("btnReportsFolder")) document.getElementById("btnReportsFolder").addEventListener("click", () => showReportsFolder());
 if (navProfile) navProfile.addEventListener("click", (e) => { 
   e.preventDefault(); 
   if (currentUser) MapsTo('profile/' + currentUser.id); 
@@ -1753,6 +1835,8 @@ document.addEventListener("click", async (event) => {
   const likeBtn = event.target.closest(".action-like");
   const commentBtn = event.target.closest(".action-comment");
   const deleteButton = event.target.closest(".action-delete");
+  const deleteAdminButton = event.target.closest(".action-delete-admin");
+  const postMoreBtn = event.target.closest(".post-more");
   const followBtn = event.target.closest(".btn-follow");
   const postElement = event.target.closest(".post");
   
@@ -1827,6 +1911,124 @@ document.addEventListener("click", async (event) => {
       showFeedback("Error", "error");
     }
   }
+
+  // HANDLE ADMIN DELETE
+  if (deleteAdminButton) {
+    if (!currentUser) { window.location.href = "login.html"; return; }
+    if (deleteAdminButton.textContent === "Delete") {
+      deleteAdminButton.textContent = "Confirm?";
+      deleteAdminButton.style.color = "#ff4444";
+      setTimeout(() => {
+        if (deleteAdminButton.textContent === "Confirm?") {
+          deleteAdminButton.textContent = "Delete";
+          deleteAdminButton.style.color = "var(--muted)";
+        }
+      }, 3000);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE" });
+      if (res.ok) {
+        postElement.remove();
+        showFeedback("Post deleted by admin.", "success");
+      } else {
+        showFeedback("Delete failed", "error");
+      }
+    } catch (err) {
+      showFeedback("Error", "error");
+    }
+    return;
+  }
+
+  // HANDLE POST MORE MENU (three dots)
+  if (postMoreBtn) {
+    const postElement = event.target.closest(".post");
+    if (!postElement || !currentUser) {
+      window.location.href = "login.html";
+      return;
+    }
+    
+    const postId = postElement.dataset.postId;
+    if (!postId) return;
+    
+    // Check if menu is already open
+    let menu = postElement.querySelector(".post-menu");
+    if (menu && !menu.classList.contains("hidden")) {
+      menu.remove();
+      return;
+    }
+    
+    // Create menu
+    menu = document.createElement("div");
+    menu.className = "post-menu hidden";
+    menu.style.position = "absolute";
+    menu.style.top = "40px";
+    menu.style.right = "0";
+    menu.style.background = "var(--panel)";
+    menu.style.border = "1px solid var(--panel-border)";
+    menu.style.borderRadius = "12px";
+    menu.style.zIndex = "100";
+    menu.style.minWidth = "160px";
+    menu.style.overflow = "hidden";
+    menu.style.boxShadow = "0 10px 30px rgba(0,0,0,0.5)";
+    
+    const isOwner = postElement.dataset.ownerId === String(currentUser?.id);
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'ceo' || currentUser.role === 'mod');
+    
+    let menuItems = [];
+    
+    if (isOwner) {
+      menuItems.push({ text: "Delete", action: "delete" });
+    } else if (isAdmin) {
+      menuItems.push({ text: "Delete Post", action: "delete-admin" });
+    } else {
+      menuItems.push({ text: "Report", action: "report" });
+    }
+    
+    menuItems.push({ text: "Copy Link", action: "copy-link" });
+    
+    menuItems.forEach(item => {
+      const itemEl = document.createElement("button");
+      itemEl.type = "button";
+      itemEl.className = "post-menu-item";
+      itemEl.textContent = item.text;
+      itemEl.style.display = "block";
+      itemEl.style.width = "100%";
+      itemEl.style.padding = "12px 16px";
+      itemEl.style.background = "none";
+      itemEl.style.border = "none";
+      itemEl.style.color = "var(--text)";
+      itemEl.style.fontSize = "14px";
+      itemEl.style.fontWeight = "500";
+      itemEl.style.cursor = "pointer";
+      itemEl.style.textAlign = "left";
+      itemEl.dataset.action = item.action;
+      itemEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.remove();
+        handlePostMenuAction(postElement, item.action, postId);
+      });
+      menu.appendChild(itemEl);
+    });
+    
+    postElement.appendChild(menu);
+    menu.classList.remove("hidden");
+    
+    // Close menu when clicking outside
+    setTimeout(() => {
+      document.addEventListener("click", closeMenu);
+    }, 0);
+    
+    function closeMenu(closeEvent) {
+      if (!postElement.contains(closeEvent.target)) {
+        if (menu) menu.remove();
+        document.removeEventListener("click", closeMenu);
+      }
+    }
+    
+    return;
+  }
 });
 
 // Sticky Header Scroll Logic
@@ -1844,9 +2046,38 @@ function handleScroll() {
 
 window.addEventListener("scroll", handleScroll);
 
+// ── Mobile Composer Placement ──────────────────────────────────────────────
+// On mobile (≤900px) the composer lives inside #feedScrollArea so it scrolls
+// away naturally with the posts.  On desktop it stays inside the sticky header.
+const composerContainer = document.querySelector(".composer-container");
+const mobileComposerSlot = document.getElementById("mobileComposerSlot");
+const desktopComposerParent = document.getElementById("stickyHeader");
+
+function placeComposer() {
+  if (!composerContainer || !mobileComposerSlot || !desktopComposerParent) return;
+  const isMobile = window.innerWidth <= 900;
+  if (isMobile) {
+    // Move into the scroll area as the first item
+    if (composerContainer.parentElement !== mobileComposerSlot) {
+      mobileComposerSlot.appendChild(composerContainer);
+    }
+  } else {
+    // Move back into the sticky header
+    if (composerContainer.parentElement !== desktopComposerParent) {
+      desktopComposerParent.appendChild(composerContainer);
+    }
+  }
+}
+
+placeComposer();
+window.addEventListener("resize", placeComposer);
+// ──────────────────────────────────────────────────────────────────────────
+
 const feedScrollEl = document.getElementById("feedView");
 if (feedScrollEl) {
   feedScrollEl.addEventListener("scroll", () => {
+    // Only apply composer-hidden hide/show on desktop (composer is in sticky header there)
+    if (window.innerWidth <= 900) return;
     const st = feedScrollEl.scrollTop || 0;
     const delta = st - lastFeedScrollTop;
     const nearTop = st < 28;
@@ -2030,32 +2261,27 @@ function switchSettingsTab(tabId) {
   });
   settingsTabTitle.textContent = tabId.charAt(0).toUpperCase() + tabId.slice(1);
 
-  // Lock premium features
-  const isPremium = currentUser && !!currentUser.is_premium;
+  // Lock premium features - isSynced is always true now (no email verification)
   const isSynced = true;
   
   if (avatarUploadArea) {
-    avatarUploadArea.classList.toggle('locked', !isPremium || !isSynced);
-    avatarUploadArea.style.pointerEvents = (isPremium && isSynced) ? 'auto' : 'none';
+    avatarUploadArea.classList.toggle('locked', !isPremium);
+    avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
   }
   if (avatarLockedMsg) {
-    avatarLockedMsg.classList.toggle('hidden', isPremium && isSynced);
-    if (isPremium && !isSynced) {
-      avatarLockedMsg.innerHTML = '<span>??</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
-    } else if (!isPremium) {
+    avatarLockedMsg.classList.toggle('hidden', isPremium);
+    if (!isPremium) {
       avatarLockedMsg.innerHTML = '<span>??</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
     }
   }
   
   if (bannerUploadArea) {
-    bannerUploadArea.classList.toggle('locked', !isPremium || !isSynced);
-    bannerUploadArea.style.pointerEvents = (isPremium && isSynced) ? 'auto' : 'none';
+    bannerUploadArea.classList.toggle('locked', !isPremium);
+    bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
   }
   if (bannerLockedMsg) {
-    bannerLockedMsg.classList.toggle('hidden', isPremium && isSynced);
-    if (!isSynced) {
-      bannerLockedMsg.innerHTML = '<span>??</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
-    } else {
+    bannerLockedMsg.classList.toggle('hidden', isPremium);
+    if (!isPremium) {
       bannerLockedMsg.innerHTML = '<span>??</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
     }
   }
@@ -2661,6 +2887,56 @@ async function handleFollow(userId, button) {
     button.textContent = originalText;
   } finally {
     button.disabled = false;
+  }
+}
+
+async function handlePostMenuAction(postElement, action, postId) {
+  if (action === "delete") {
+    // Trigger delete button click
+    const deleteBtn = postElement.querySelector(".action-delete");
+    if (deleteBtn) {
+      deleteBtn.click();
+    }
+  } else if (action === "delete-admin") {
+    // Trigger admin delete button click
+    const deleteAdminBtn = postElement.querySelector(".action-delete-admin");
+    if (deleteAdminBtn) {
+      deleteAdminBtn.click();
+    }
+  } else if (action === "report") {
+    // Report the post
+    if (!currentUser) { window.location.href = "login.html"; return; }
+    if (pendingPostActions.has(`report-${postId}`)) return;
+    pendingPostActions.add(`report-${postId}`);
+    
+    try {
+      const res = await fetch(`${API_URL}/posts/${postId}/report`, { method: "POST", credentials: "include" });
+      if (res.ok) {
+        showFeedback("Report submitted.", "success");
+        // Add report notification to the user
+        await fetch(`${API_URL}/notifications/report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ post_id: postId, reporter_id: currentUser.id }),
+          credentials: "include"
+        });
+      } else {
+        const err = await res.json();
+        showFeedback(err.error || "Report failed", "error");
+      }
+    } catch (err) {
+      showFeedback("Error", "error");
+    } finally {
+      pendingPostActions.delete(`report-${postId}`);
+    }
+  } else if (action === "copy-link") {
+    const url = window.location.origin + window.location.pathname + `#post/${postId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showFeedback("Link copied!", "success");
+    } catch (err) {
+      showFeedback("Failed to copy link", "error");
+    }
   }
 }
 

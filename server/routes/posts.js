@@ -155,13 +155,10 @@ router.post("/", isAuthenticated, upload.single("image"), async (req, res, next)
   }
 
   if (imagePath) {
-    const userRes = await db.query("SELECT is_premium, is_synced FROM users WHERE id = $1", [userId]);
+    const userRes = await db.query("SELECT is_premium FROM users WHERE id = $1", [userId]);
     const user = userRes.rows[0];
     if (!user || !user.is_premium) {
       return res.status(403).json({ error: "Uploading images requires Core Flow." });
-    }
-    if (!user.is_synced) {
-      return res.status(403).json({ error: "Please sync your email in settings to upload images." });
     }
   }
 
@@ -342,6 +339,31 @@ router.delete("/:id/like", isAuthenticated, async (req, res, next) => {
     } finally {
       client.release();
     }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Report a post
+router.post("/:id/report", isAuthenticated, async (req, res, next) => {
+  const db = req.app.locals.db;
+  const userId = req.session.userId;
+  const postId = parseInt(req.params.id);
+
+  try {
+    // Check if post exists
+    const postRow = await db.query("SELECT id, user_id FROM posts WHERE id = $1", [postId]);
+    if (!postRow.rows[0]) return res.status(404).json({ error: "Post not found." });
+
+    // Check if user already reported this post
+    const existingReport = await db.query("SELECT id FROM reports WHERE post_id = $1 AND reporter_id = $2", [postId, userId]);
+    if (existingReport.rows.length > 0) {
+      return res.status(400).json({ error: "You have already reported this post." });
+    }
+
+    // Create report
+    await db.query("INSERT INTO reports (post_id, reporter_id, created_at) VALUES ($1, $2, NOW())", [postId, userId]);
+    res.json({ message: "Post reported." });
   } catch (err) {
     next(err);
   }

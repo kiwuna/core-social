@@ -69,6 +69,11 @@ const profileContent = document.getElementById("profileContent");
 const settingsModal = document.getElementById("settingsModal");
 const closeSettings = document.getElementById("closeSettings");
 const saveProfile = document.getElementById("saveProfile");
+const followModal = document.getElementById("followModal");
+const followTabFollowers = document.getElementById("followTabFollowers");
+const followTabFollowing = document.getElementById("followTabFollowing");
+const closeFollowModal = document.getElementById("closeFollowModal");
+const followListContent = document.getElementById("followListContent");
 
 const settingsNavItems = document.querySelectorAll(".settings-nav-item");
 const settingsTabContents = document.querySelectorAll(".settings-tab-content");
@@ -805,6 +810,7 @@ window.MapsTo = function(viewPath, push = true) {
   if (view !== 'settings') {
     if (settingsModal) settingsModal.classList.remove("show");
   }
+  if (followModal) followModal.classList.remove("show");
 
   switch(view) {
     case 'feed':
@@ -843,6 +849,7 @@ window.onpopstate = (event) => {
     MapsTo(hash, false);
   } else {
     if (settingsModal) settingsModal.classList.remove("show");
+    if (followModal) followModal.classList.remove("show");
     showFeed();
   }
 };
@@ -944,6 +951,17 @@ async function showProfile(userId) {
       profileView,
       ".profile-animate-nav, .profile-animate-header, .profile-animate-info, .profile-animate-tabs, .profile-animate-posts"
     );
+
+    const followerCountDisplay = document.getElementById("followerCountDisplay");
+    const followingCountDisplay = document.getElementById("followingCountDisplay");
+    if (followerCountDisplay) {
+      followerCountDisplay.style.cursor = "pointer";
+      followerCountDisplay.addEventListener("click", () => openFollowModal(userId, "followers"));
+    }
+    if (followingCountDisplay) {
+      followingCountDisplay.style.cursor = "pointer";
+      followingCountDisplay.addEventListener("click", () => openFollowModal(userId, "following"));
+    }
 
     const profilePosts = document.getElementById("profilePosts");
     const tabPosts = profileContent.querySelector('.profile-tabs .tab:nth-child(1)');
@@ -3139,6 +3157,208 @@ if (testPushBtn) {
       }
     } catch (error) {
       showFeedback("Failed to send test notification.", "error");
+    }
+  });
+}
+
+/* ========================================== */
+/* TikTok-Style Followers & Following Modal    */
+/* ========================================== */
+let currentFollowModalUserId = null;
+let currentFollowModalTab = "followers";
+
+function openFollowModal(userId, tab) {
+  if (!followModal) return;
+  currentFollowModalUserId = userId;
+  currentFollowModalTab = tab;
+
+  followModal.classList.add("show");
+
+  // Toggle active tab visual classes
+  if (followTabFollowers) followTabFollowers.classList.toggle("active", tab === "followers");
+  if (followTabFollowing) followTabFollowing.classList.toggle("active", tab === "following");
+
+  loadFollowModalData();
+}
+
+async function loadFollowModalData() {
+  if (!currentFollowModalUserId || !followListContent) return;
+  
+  followListContent.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; padding: 40px;">
+      <div class="search-spinner"></div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`/users/${currentFollowModalUserId}/${currentFollowModalTab}`);
+    if (!res.ok) throw new Error("Failed to load list");
+    const users = await res.json();
+    renderFollowModalList(users);
+  } catch (err) {
+    followListContent.innerHTML = `
+      <div class="follow-empty-state">
+        <span>⚠️</span>
+        <p>Could not load list</p>
+      </div>
+    `;
+  }
+}
+
+function renderFollowModalList(users) {
+  if (!followListContent) return;
+  followListContent.innerHTML = "";
+  if (users.length === 0) {
+    const emptyMsg = currentFollowModalTab === "followers" 
+      ? "No followers yet." 
+      : "Not following anyone yet.";
+    followListContent.innerHTML = `
+      <div class="follow-empty-state">
+        <span>👥</span>
+        <p>${emptyMsg}</p>
+      </div>
+    `;
+    return;
+  }
+
+  users.forEach(user => {
+    const card = document.createElement("div");
+    card.className = "follow-user-card";
+    
+    const isMe = currentUser && String(currentUser.id) === String(user.id);
+    const isPremium = !!user.is_premium;
+    const verifiedBadge = isPremium ? `<span class="verified-check" title="Core Flow"></span>` : "";
+
+    const avatarInner = (isPremium && user.avatar_path)
+      ? `<img src="${user.avatar_path.startsWith('http') ? user.avatar_path : API_URL + user.avatar_path}" />`
+      : (user.emoji || "👻");
+
+    // Action button setup: follow/unfollow
+    let actionBtnHtml = "";
+    if (!isMe && currentUser) {
+      actionBtnHtml = `
+        <button class="follow-btn-action ${user.is_following ? 'following' : ''}" data-user-id="${user.id}">
+          ${user.is_following ? 'Following' : 'Follow'}
+        </button>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="follow-user-avatar">${avatarInner}</div>
+      <div class="follow-user-info">
+        <div class="follow-user-name">
+          <span class="${isPremium ? 'premium-name-gradient' : ''}">${user.display_name || user.username}</span>
+          ${verifiedBadge}
+        </div>
+        <div class="follow-user-handle">@${user.username.toLowerCase()}</div>
+      </div>
+      ${actionBtnHtml}
+    `;
+
+    // Click on user card navigates to profile
+    card.addEventListener("click", (e) => {
+      // Don't navigate if clicking action button
+      if (e.target.closest('.follow-btn-action')) return;
+      
+      if (followModal) followModal.classList.remove("show");
+      MapsTo(`profile/${user.id}`);
+    });
+
+    // Wire action button inside card
+    const actionBtn = card.querySelector('.follow-btn-action');
+    if (actionBtn) {
+      actionBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        
+        const isFollowing = actionBtn.classList.contains("following");
+        actionBtn.disabled = true;
+        const originalText = actionBtn.textContent;
+        actionBtn.textContent = "...";
+
+        try {
+          const res = await fetch(`/users/${user.id}/follow`, {
+            method: isFollowing ? "DELETE" : "POST"
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const nowFollowing = !isFollowing;
+            actionBtn.classList.toggle("following", nowFollowing);
+            actionBtn.textContent = nowFollowing ? "Following" : "Follow";
+            showFeedback(data.message, "success");
+
+            // If we are currently viewing this user's profile, update the follow counts
+            const profileFollowBtn = document.querySelector(`.btn-follow[data-user-id="${user.id}"]`);
+            if (profileFollowBtn) {
+              profileFollowBtn.classList.toggle("following", nowFollowing);
+              profileFollowBtn.textContent = nowFollowing ? "Following" : "Follow";
+            }
+            
+            // Also update counts on profile if relevant
+            const activeProfileId = window.location.hash.split('/')[1];
+            if (activeProfileId) {
+              const followerCountEl = document.getElementById("followerCountDisplay");
+              const followingCountEl = document.getElementById("followingCountDisplay");
+              
+              if (String(activeProfileId) === String(user.id) && followerCountEl) {
+                const b = followerCountEl.querySelector("b");
+                let count = parseInt(b.textContent.replace(/[^0-9]/g, "")) || 0;
+                count = nowFollowing ? count + 1 : Math.max(0, count - 1);
+                b.textContent = formatNumber(count);
+              }
+              if (currentUser && String(activeProfileId) === String(currentUser.id) && followingCountEl) {
+                const b = followingCountEl.querySelector("b");
+                let count = parseInt(b.textContent.replace(/[^0-9]/g, "")) || 0;
+                count = nowFollowing ? count + 1 : Math.max(0, count - 1);
+                b.textContent = formatNumber(count);
+              }
+            }
+          } else {
+            const err = await res.json();
+            showFeedback(err.error || "Action failed", "error");
+            actionBtn.textContent = originalText;
+          }
+        } catch (err) {
+          showFeedback("Error connecting to server", "error");
+          actionBtn.textContent = originalText;
+        } finally {
+          actionBtn.disabled = false;
+        }
+      });
+    }
+
+    followListContent.appendChild(card);
+  });
+}
+
+// Event Listeners for the follow modal
+if (followTabFollowers) {
+  followTabFollowers.addEventListener("click", () => {
+    if (currentFollowModalTab === "followers") return;
+    currentFollowModalTab = "followers";
+    followTabFollowers.classList.add("active");
+    if (followTabFollowing) followTabFollowing.classList.remove("active");
+    loadFollowModalData();
+  });
+}
+if (followTabFollowing) {
+  followTabFollowing.addEventListener("click", () => {
+    if (currentFollowModalTab === "following") return;
+    currentFollowModalTab = "following";
+    followTabFollowing.classList.add("active");
+    if (followTabFollowers) followTabFollowers.classList.remove("active");
+    loadFollowModalData();
+  });
+}
+if (closeFollowModal) {
+  closeFollowModal.addEventListener("click", () => {
+    if (followModal) followModal.classList.remove("show");
+  });
+}
+if (followModal) {
+  followModal.addEventListener("click", (e) => {
+    if (e.target === followModal) {
+      followModal.classList.remove("show");
     }
   });
 }

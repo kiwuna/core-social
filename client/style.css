@@ -3467,3 +3467,209 @@ body {
     bottom: calc(var(--vv-height) - var(--vv-offset-top) - var(--safe-bottom));
   }
 }
+
+/* Follow Modal Style (TikTok-style) */
+#followModal {
+  background: rgba(5, 5, 5, 0.3) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.follow-container {
+  width: 100%;
+  max-width: 500px;
+  height: 75vh;
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 40px 80px -15px rgba(0,0,0,0.8);
+  animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.follow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.follow-tabs {
+  display: flex;
+  gap: 24px;
+}
+
+.follow-tab {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 0;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.follow-tab:hover {
+  color: #fff;
+}
+
+.follow-tab.active {
+  color: #fff;
+}
+
+.follow-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #6366f1;
+  border-radius: 2px;
+}
+
+.follow-close {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 28px;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.follow-close:hover {
+  color: #fff;
+}
+
+.follow-list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* User Items in the Follow List */
+.follow-user-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.follow-user-card:hover {
+  background: var(--panel-hover);
+}
+
+.follow-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  border: 1px solid var(--panel-border);
+  overflow: hidden;
+}
+
+.follow-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.follow-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.follow-user-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.follow-user-handle {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.follow-btn-action {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  background: #fff;
+  color: #000;
+}
+
+.follow-btn-action:hover {
+  background: #eee;
+}
+
+.follow-btn-action.following {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.follow-btn-action.following:hover {
+  background: rgba(255, 68, 68, 0.1);
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+/* Empty list state */
+.follow-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 32px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.follow-empty-state span {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.follow-empty-state p {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .follow-container {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+  }
+}

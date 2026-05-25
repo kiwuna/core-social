@@ -112,4 +112,56 @@ router.get("/:id/likes", async (req, res, next) => {
   }
 });
 
+// GET /users/:id/followers
+router.get("/:id/followers", async (req, res, next) => {
+  const targetId = parseInt(req.params.id);
+  const currentUserId = req.session.userId || null;
+  const db = req.app.locals.db;
+
+  try {
+    const query = `
+      SELECT 
+        u.id, u.username, u.display_name, u.emoji, u.avatar_path, u.is_premium,
+        EXISTS(
+          SELECT 1 FROM follows 
+          WHERE follower_id = $1 AND following_id = u.id
+        ) as is_following
+      FROM follows f
+      JOIN users u ON f.follower_id = u.id
+      WHERE f.following_id = $2
+      ORDER BY f.created_at DESC
+    `;
+    const result = await db.query(query, [currentUserId, targetId]);
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /users/:id/following
+router.get("/:id/following", async (req, res, next) => {
+  const targetId = parseInt(req.params.id);
+  const currentUserId = req.session.userId || null;
+  const db = req.app.locals.db;
+
+  try {
+    const query = `
+      SELECT 
+        u.id, u.username, u.display_name, u.emoji, u.avatar_path, u.is_premium,
+        EXISTS(
+          SELECT 1 FROM follows 
+          WHERE follower_id = $1 AND following_id = u.id
+        ) as is_following
+      FROM follows f
+      JOIN users u ON f.following_id = u.id
+      WHERE f.follower_id = $2
+      ORDER BY f.created_at DESC
+    `;
+    const result = await db.query(query, [currentUserId, targetId]);
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

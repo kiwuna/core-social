@@ -517,6 +517,22 @@
     </div>
   </div>
 
+  <!-- Followers / Following List Modal -->
+  <div id="followModal" class="settings-modal" style="z-index: 9990;">
+    <div class="follow-container">
+      <div class="follow-header">
+        <div class="follow-tabs">
+          <button id="followTabFollowers" class="follow-tab active">Followers</button>
+          <button id="followTabFollowing" class="follow-tab">Following</button>
+        </div>
+        <button id="closeFollowModal" class="follow-close">&times;</button>
+      </div>
+      <div id="followListContent" class="follow-list-content">
+        <!-- User list items will be injected here -->
+      </div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="./script.js"></script>
 </body>

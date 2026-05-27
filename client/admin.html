@@ -86,6 +86,25 @@
   }
 
   @media (max-width: 700px) {
+    html,
+    body {
+      position: static !important;
+      width: 100%;
+      min-height: 100%;
+      height: auto;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: auto;
+      touch-action: pan-y;
+    }
+
+    body {
+      display: block !important;
+      align-items: stretch !important;
+      justify-content: flex-start !important;
+    }
+
     .admin-container {
       margin: 16px auto;
       padding: 0 12px 40px;
@@ -151,6 +170,18 @@
 
     .warning-reason-box input {
       width: 100%;
+    }
+
+    .admin-modal.show {
+      align-items: flex-start;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 20px 12px;
+    }
+
+    .admin-modal-content {
+      margin: 0 auto;
+      max-height: none;
     }
   }
 

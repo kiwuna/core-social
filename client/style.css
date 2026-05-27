@@ -402,6 +402,34 @@ body {
   box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
 }
 
+.post-repost-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+
+.post-repost-label .repost-icon-img,
+.post-foot .repost-icon-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  display: block;
+  flex: 0 0 16px;
+  filter: brightness(0) invert(0.72);
+  opacity: 0.9;
+}
+
+.post-foot .action-repost:hover .repost-icon-img,
+.post-repost-label:hover .repost-icon-img {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
 .post-head { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
 .post-head .mini-avatar { 
   width: 44px; height: 44px; border-radius: 14px; 
@@ -431,10 +459,69 @@ body {
   display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; 
   padding: 4px 8px; border-radius: 8px;
 }
+.post-foot .post-foot-spacer {
+  flex: 1;
+  cursor: default;
+  padding: 0;
+  gap: 0;
+}
+.post-foot .post-foot-spacer:hover {
+  background: transparent;
+  color: inherit;
+}
 .post-foot span:hover { background: var(--accent-muted); color: var(--text); }
 .post-foot span.liked { color: #f43f5e; }
 .post-foot span.liked svg { fill: #f43f5e; stroke: #f43f5e; }
 .post-foot span.liked:hover { background: rgba(244, 63, 94, 0.1); }
+.post-foot .action-views,
+.post-foot .action-repost {
+  white-space: nowrap;
+}
+
+.post-foot .action-views {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0.9;
+  margin-left: 0;
+}
+
+.post-foot .action-repost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.post-foot .action-repost:hover {
+  background: var(--accent-muted);
+  color: var(--text);
+}
+
+.post-foot .action-repost.busy {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.post-foot .repost-count {
+  min-width: 12px;
+  font-size: 12px;
+  margin-left: 0;
+}
+
+.post-foot .views-count {
+  min-width: 12px;
+}
+
+.post-foot .action-delete,
+.post-foot .action-delete-admin {
+  margin-left: 0 !important;
+}
 
 /* Comments Section */
 .comments-section {
@@ -484,28 +571,36 @@ body {
 
 .comment-form {
   display: flex;
+  align-items: center;
   gap: 12px;
   margin-top: 8px;
 }
 
 .comment-form input {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--panel-border);
   border-radius: 20px;
-  padding: 10px 16px;
+  padding: 0 16px;
   color: #fff;
   font-size: 14px;
   outline: none;
+  box-sizing: border-box;
 }
 
 .comment-form .btn-send-comment {
+  flex: 0 0 36px;
   background: #fff;
   color: #000;
   border: none;
   border-radius: 50%;
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -574,6 +669,7 @@ body {
   width: 100%;
   margin: 0;
   padding: 0;
+  overflow: visible;
 }
 
 .profile-nav-top {
@@ -1415,6 +1511,7 @@ body {
   flex-direction: column;
   gap: 12px;
   animation: searchFadeIn 0.8s ease;
+  padding-bottom: 24px;
 }
 
 /* People Result Card */
@@ -1818,6 +1915,24 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.messages-list-preview-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.messages-list-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: capitalize;
 }
 
 .notifications-loading {
@@ -2476,6 +2591,11 @@ body {
     z-index: 1100;
   }
 
+  #feedView:not(.composer-hidden) .sticky-header {
+    transform: translateY(0) !important;
+    visibility: visible !important;
+  }
+
   #feedView .feed-tabs-container {
     padding-top: 8px !important;
   }
@@ -2520,7 +2640,20 @@ body {
   }
 
   .profile-view-container {
+    padding-top: 12px;
     padding-bottom: calc(64px + var(--safe-bottom) + 32px);
+  }
+
+  .profile-hero {
+    margin-top: 4px;
+  }
+
+  .profile-banner {
+    margin-top: 0;
+  }
+
+  .profile-avatar-area {
+    margin-top: -44px;
   }
 
   .profile-posts-list {
@@ -2547,6 +2680,10 @@ body {
     padding-bottom: calc(64px + var(--safe-bottom) + 24px);
   }
 
+  .search-results {
+    padding-bottom: calc(96px + var(--safe-bottom));
+  }
+
   #notificationsView.feed {
     overflow-y: auto;
     overflow-x: hidden;
@@ -2559,10 +2696,11 @@ body {
     padding-bottom: calc(64px + var(--safe-bottom) + 24px);
   }
 
-  #chatMessages {
-    touch-action: pan-y;
-    -webkit-overflow-scrolling: touch;
-  }
+#chatMessages {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  gap: 4px;
+}
 
   input,
   textarea,
@@ -2577,6 +2715,40 @@ body {
 
   .post-image {
     height: 300px;
+  }
+
+  .post-foot {
+    flex-wrap: nowrap;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .post-foot .post-foot-spacer {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .post-foot .action-repost,
+  .post-foot .action-views {
+    flex: 0 0 auto;
+  }
+
+  .post-foot .action-delete,
+  .post-foot .action-delete-admin {
+    margin-left: auto !important;
+    flex: 0 0 auto;
+  }
+
+  .post-foot .action-views .views-label {
+    display: none;
+  }
+
+  .post-foot .action-views,
+  .post-foot .action-repost,
+  .post-foot .action-delete,
+  .post-foot .action-delete-admin {
+    padding-left: 4px;
+    padding-right: 4px;
   }
 
   /* Modal Adjustments */
@@ -2637,6 +2809,8 @@ body {
     margin-left: 20px;
     margin-right: 16px;
     margin-top: -50px;
+    position: relative;
+    z-index: 15;
   }
 
   .large-avatar-wrap {
@@ -3425,6 +3599,23 @@ body {
   transform-origin: bottom center;
 }
 
+.message-status {
+  display: inline-block;
+  align-self: flex-end;
+  margin-right: 4px;
+  opacity: 0.75;
+}
+
+#typingIndicator {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  padding-bottom: 2px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 @keyframes messageAppear {
   to {
     opacity: 1;
@@ -3437,12 +3628,31 @@ body {
     height: 100dvh !important;
     min-height: 100dvh;
     padding-bottom: 0;
-    overflow: visible;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     touch-action: pan-y;
   }
 
   #messagesView.chat-shell {
     padding-bottom: calc(64px + var(--safe-bottom));
+  }
+
+  #messagesView .sticky-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2200;
+    flex-shrink: 0;
+    background: rgba(10, 10, 10, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  #messagesView .chat-messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   #chatInput {
@@ -3671,5 +3881,76 @@ body {
     max-height: none;
     border-radius: 0;
     border: none;
+  }
+
+  #followModal {
+    padding: 0;
+  }
+
+  .follow-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
+  .follow-header {
+    padding: 14px 16px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: rgba(5, 5, 5, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .follow-tabs {
+    gap: 8px;
+    flex: 1;
+  }
+
+  .follow-tab {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .follow-close {
+    width: 36px;
+    height: 36px;
+    font-size: 26px;
+    flex: 0 0 auto;
+  }
+
+  .follow-list-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 12px 88px;
+  }
+
+  .follow-user-card {
+    padding: 14px 12px;
+    gap: 12px;
+    border-radius: 18px;
+  }
+
+  .follow-user-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+
+  .follow-user-name {
+    font-size: 14px;
+  }
+
+  .follow-user-handle {
+    font-size: 12px;
+  }
+
+  .follow-btn-action {
+    padding: 8px 12px;
+    font-size: 12px;
   }
 }

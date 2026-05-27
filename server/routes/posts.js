@@ -6,6 +6,9 @@ const { isAuthenticated } = require("../middleware/auth");
 
 const router = express.Router();
 const MAX_POST_LENGTH = Number(process.env.MAX_POST_LENGTH) || 300;
+const VIEW_MIN_VISIBLE_MS = Number(process.env.VIEW_MIN_VISIBLE_MS) || 1200;
+const VIEW_MIN_TOTAL_MS = Number(process.env.VIEW_MIN_TOTAL_MS) || 2000;
+const VIEW_HEARTBEAT_MAX_AGE_MS = Number(process.env.VIEW_HEARTBEAT_MAX_AGE_MS) || 15000;
 const uploadsDirectory = path.join(__dirname, "..", "uploads");
 
 fs.mkdirSync(uploadsDirectory, { recursive: true });
@@ -68,6 +71,107 @@ async function attachPolls(db, posts, currentUserId) {
   return Promise.all(fetchPolls);
 }
 
+function getVisitorKey(req) {
+  const anon = typeof req.body?.visitorKey === "string" ? req.body.visitorKey.trim() : "";
+  const sessionUser = req.session?.userId ? `user:${req.session.userId}` : "";
+  return sessionUser || anon || `ip:${req.ip || "unknown"}`;
+}
+
+function hashish(value) {
+  return require("crypto").createHash("sha256").update(String(value || "")).digest("hex");
+}
+
+async function recordViewEvent(db, payload) {
+  const {
+    postId,
+    visitorKey,
+    userId,
+    sessionId,
+    visibleMs = 0,
+    watchMs = 0,
+    viewportRatio = 0,
+    eventType = "heartbeat",
+    deviceHint = null,
+    ipHash = null,
+    userAgentHash = null,
+    completed = false
+  } = payload;
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const existingRes = await client.query(
+      `SELECT id, is_viewed FROM post_impressions WHERE post_id = $1 AND visitor_key = $2 FOR UPDATE`,
+      [postId, visitorKey]
+    );
+    const existingRow = existingRes.rows[0] || null;
+    const wasViewed = !!existingRow?.is_viewed;
+    const shouldCountView = completed && !wasViewed;
+    const impressionRes = await client.query(
+      `
+      INSERT INTO post_impressions (
+        post_id, visitor_key, user_id, session_id, first_seen_at, last_seen_at,
+        visible_ms, is_viewed, device_hint, ip_hash, user_agent_hash
+      )
+      VALUES ($1, $2, $3, $4, NOW(), NOW(), $5, $6, $7, $8, $9)
+      ON CONFLICT (post_id, visitor_key)
+      DO UPDATE SET
+        last_seen_at = NOW(),
+        visible_ms = post_impressions.visible_ms + EXCLUDED.visible_ms,
+        is_viewed = post_impressions.is_viewed OR EXCLUDED.is_viewed,
+        user_id = COALESCE(post_impressions.user_id, EXCLUDED.user_id),
+        session_id = COALESCE(post_impressions.session_id, EXCLUDED.session_id)
+      RETURNING id, is_viewed, visible_ms
+      `,
+      [postId, visitorKey, userId || null, sessionId || null, visibleMs, completed, deviceHint, ipHash, userAgentHash]
+    );
+
+    await client.query(
+      `
+      INSERT INTO post_view_events (
+        post_id, visitor_key, user_id, event_type, visible_ms, watch_ms, viewport_ratio, created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      `,
+      [postId, visitorKey, userId || null, eventType, Math.max(0, Math.round(visibleMs)), Math.max(0, Math.round(watchMs)), Number(viewportRatio) || 0]
+    );
+
+    const day = new Date().toISOString().slice(0, 10);
+    const isNewUniqueView = shouldCountView;
+    if (visibleMs > 0 || watchMs > 0 || eventType === "impression") {
+      await client.query(
+        `
+        INSERT INTO post_view_aggregates (post_id, day, impressions, unique_views, views, watch_ms, updated_at)
+        VALUES ($1, $2, 1, $3, $4, $5, NOW())
+        ON CONFLICT (post_id, day)
+        DO UPDATE SET
+          impressions = post_view_aggregates.impressions + 1,
+          unique_views = post_view_aggregates.unique_views + EXCLUDED.unique_views,
+          views = post_view_aggregates.views + EXCLUDED.views,
+          watch_ms = post_view_aggregates.watch_ms + EXCLUDED.watch_ms,
+          updated_at = NOW()
+        `,
+        [postId, day, isNewUniqueView ? 1 : 0, isNewUniqueView ? 1 : 0, Math.max(0, Math.round(watchMs))]
+      );
+    }
+
+    if (existingRow && shouldCountView) {
+      await client.query(
+        `UPDATE post_impressions SET is_viewed = TRUE WHERE id = $1`,
+        [existingRow.id]
+      );
+    }
+
+    await client.query("COMMIT");
+    return { impression: impressionRes.rows[0], isNewUniqueView };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // Get all posts
 router.get("/", async (req, res, next) => {
   const db = req.app.locals.db;
@@ -85,7 +189,9 @@ router.get("/", async (req, res, next) => {
         COALESCE(u.is_synced, false) as is_synced,
         u.avatar_path,
         EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
+        EXISTS(SELECT 1 FROM reposts WHERE user_id = $1 AND post_id = p.id) as has_reposted,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+        (SELECT COUNT(*) FROM reposts WHERE post_id = p.id) as repost_count,
         pl.id as poll_id, pl.question as poll_question
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
@@ -108,6 +214,75 @@ router.get("/user/:userId", async (req, res, next) => {
 
   try {
     const query = `
+      WITH profile_items AS (
+        SELECT 
+          p.id, p.content, p.likes, p.image_path, p.video_path, p.media_type, p.created_at, p.user_id,
+          COALESCE(p.font_style, 'default') as font_style,
+          COALESCE(u.emoji, 'ðŸ‘»') as emoji,
+          COALESCE(u.username, 'anonymous') as username,
+          u.display_name,
+          COALESCE(u.is_premium, 0) as is_premium,
+          COALESCE(u.is_synced, false) as is_synced,
+          u.avatar_path,
+          EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
+          EXISTS(SELECT 1 FROM reposts WHERE user_id = $1 AND post_id = p.id) as has_reposted,
+          (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+          (SELECT COUNT(*) FROM reposts WHERE post_id = p.id) as repost_count,
+          pl.id as poll_id, pl.question as poll_question,
+          FALSE AS is_repost,
+          NULL::TIMESTAMP AS reposted_at,
+          NULL::INTEGER AS original_post_id,
+          NULL::TEXT AS reposted_by_name
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        LEFT JOIN polls pl ON pl.post_id = p.id
+        WHERE p.user_id = $2
+
+        UNION ALL
+
+        SELECT
+          p.id, p.content, p.likes, p.image_path, p.video_path, p.media_type, r.created_at, $2::INTEGER as user_id,
+          COALESCE(p.font_style, 'default') as font_style,
+          COALESCE(u.emoji, 'ðŸ‘»') as emoji,
+          COALESCE(u.username, 'anonymous') as username,
+          u.display_name,
+          COALESCE(u.is_premium, 0) as is_premium,
+          COALESCE(u.is_synced, false) as is_synced,
+          u.avatar_path,
+          EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
+          EXISTS(SELECT 1 FROM reposts WHERE user_id = $1 AND post_id = p.id) as has_reposted,
+          (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+          (SELECT COUNT(*) FROM reposts WHERE post_id = p.id) as repost_count,
+          pl.id as poll_id, pl.question as poll_question,
+          TRUE AS is_repost,
+          r.created_at AS reposted_at,
+          p.id AS original_post_id,
+          (SELECT COALESCE(display_name, username) FROM users WHERE id = $2) AS reposted_by_name
+        FROM reposts r
+        JOIN posts p ON p.id = r.post_id
+        LEFT JOIN users u ON p.user_id = u.id
+        LEFT JOIN polls pl ON pl.post_id = p.id
+        WHERE r.user_id = $2
+      )
+      SELECT *
+      FROM profile_items
+      ORDER BY created_at DESC, id DESC
+    `;
+    const result = await db.query(query, [currentUserId, userId]);
+    const posts = await attachPolls(db, result.rows, currentUserId);
+    res.json(posts);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/user/:userId", async (req, res, next) => {
+  const db = req.app.locals.db;
+  const userId = req.params.userId;
+  const currentUserId = req.session.userId || 0;
+
+  try {
+    const query = `
       SELECT 
         p.id, p.content, p.likes, p.image_path, p.created_at, p.user_id,
         COALESCE(p.font_style, 'default') as font_style,
@@ -118,7 +293,9 @@ router.get("/user/:userId", async (req, res, next) => {
         COALESCE(u.is_synced, false) as is_synced,
         u.avatar_path,
         EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
+        EXISTS(SELECT 1 FROM reposts WHERE user_id = $1 AND post_id = p.id) as has_reposted,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+        (SELECT COUNT(*) FROM reposts WHERE post_id = p.id) as repost_count,
         pl.id as poll_id, pl.question as poll_question
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
@@ -218,6 +395,79 @@ router.post("/", isAuthenticated, upload.single("image"), async (req, res, next)
     next(err);
   } finally {
     client.release();
+  }
+});
+
+// Repost a post
+router.post("/:id/repost", isAuthenticated, async (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+  const userId = req.session.userId;
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id." });
+  }
+
+  try {
+    const postCheck = await db.query("SELECT id FROM posts WHERE id = $1", [postId]);
+    if (!postCheck.rows[0]) {
+      return res.status(404).json({ error: "Post not found." });
+    }
+
+    const insertResult = await db.query(
+      `INSERT INTO reposts (user_id, post_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, post_id) DO NOTHING
+       RETURNING id`,
+      [userId, postId]
+    );
+
+    if (!insertResult.rows[0]) {
+      return res.status(400).json({ error: "You already reposted this post." });
+    }
+
+    const countResult = await db.query(
+      "SELECT COUNT(*)::int AS repost_count FROM reposts WHERE post_id = $1",
+      [postId]
+    );
+
+    res.json({ message: "Reposted.", repost_count: countResult.rows[0].repost_count });
+  } catch (err) {
+    console.error("Repost failed:", err.message);
+    next(err);
+  }
+});
+
+router.delete("/:id/repost", isAuthenticated, async (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+  const userId = req.session.userId;
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id." });
+  }
+
+  try {
+    const result = await db.query(
+      `DELETE FROM reposts
+       WHERE user_id = $1 AND post_id = $2
+       RETURNING id`,
+      [userId, postId]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({ error: "Repost not found." });
+    }
+
+    const countResult = await db.query(
+      "SELECT COUNT(*)::int AS repost_count FROM reposts WHERE post_id = $1",
+      [postId]
+    );
+
+    res.json({ message: "Unreposted.", repost_count: countResult.rows[0].repost_count });
+  } catch (err) {
+    console.error("Unrepost failed:", err.message);
+    next(err);
   }
 });
 
@@ -500,7 +750,9 @@ router.get("/search", async (req, res, next) => {
         COALESCE(u.is_synced, false) as is_synced,
         u.avatar_path,
         EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND post_id = p.id) as has_liked,
+        EXISTS(SELECT 1 FROM reposts WHERE user_id = $1 AND post_id = p.id) as has_reposted,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
+        (SELECT COUNT(*) FROM reposts WHERE post_id = p.id) as repost_count,
         pl.id as poll_id, pl.question as poll_question
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
@@ -517,4 +769,85 @@ router.get("/search", async (req, res, next) => {
   }
 });
 
+// Track post visibility/impressions/views
+router.post("/:id/view", async (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+  const userId = req.session.userId || null;
+  const visitorKey = getVisitorKey(req);
+  const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : null;
+  const visibleMs = Number(req.body?.visibleMs) || 0;
+  const watchMs = Number(req.body?.watchMs) || 0;
+  const viewportRatio = Number(req.body?.viewportRatio) || 0;
+  const eventType = ["impression", "heartbeat", "complete", "leave"].includes(req.body?.eventType) ? req.body.eventType : "heartbeat";
+  const completed = !!req.body?.completed || (visibleMs >= VIEW_MIN_VISIBLE_MS && watchMs >= VIEW_MIN_TOTAL_MS);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id." });
+  }
+
+  if (visibleMs < 0 || watchMs < 0) {
+    return res.status(400).json({ error: "Invalid timing payload." });
+  }
+
+  if (visibleMs > VIEW_HEARTBEAT_MAX_AGE_MS * 60) {
+    return res.status(400).json({ error: "Payload out of range." });
+  }
+
+  try {
+    const postCheck = await db.query("SELECT id FROM posts WHERE id = $1", [postId]);
+    if (!postCheck.rows[0]) {
+      return res.status(404).json({ error: "Post not found." });
+    }
+
+    const result = await recordViewEvent(db, {
+      postId,
+      visitorKey,
+      userId,
+      sessionId,
+      visibleMs,
+      watchMs,
+      viewportRatio,
+      eventType,
+      completed,
+      deviceHint: req.get("sec-ch-ua-mobile") || null,
+      ipHash: hashish(req.ip),
+      userAgentHash: hashish(req.get("user-agent"))
+    });
+
+    res.json({
+      ok: true,
+      viewRecorded: result.isNewUniqueView,
+      isUniqueView: result.impression.is_viewed || result.isNewUniqueView
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Simple analytics snapshot for a post
+router.get("/:id/views", async (req, res, next) => {
+  const db = req.app.locals.db;
+  const postId = Number(req.params.id);
+
+  try {
+    const agg = await db.query(
+      `
+      SELECT
+        COALESCE(SUM(impressions), 0) AS impressions,
+        COALESCE(SUM(unique_views), 0) AS unique_views,
+        COALESCE(SUM(views), 0) AS views,
+        COALESCE(SUM(watch_ms), 0) AS watch_ms
+      FROM post_view_aggregates
+      WHERE post_id = $1
+      `,
+      [postId]
+    );
+    res.json(agg.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
+

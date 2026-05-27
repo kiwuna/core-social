@@ -115,7 +115,7 @@ const navProfile = document.getElementById("navProfile");
 const navCoreFlow = document.getElementById("navCoreFlow");
 const tabExplore = document.getElementById("tabExplore");
 const tabFollowing = document.getElementById("tabFollowing");
-let feedMode = "explore"; // 'explore' or 'following'
+let feedMode = "for_you"; // 'for_you' or 'following'
 
 // Search Elements
 const searchInput = document.getElementById("searchInput");
@@ -147,6 +147,167 @@ const pendingPostActions = new Set();
 let selectedImageFile = null;
 let selectedImagePreviewUrl = "";
 let selectedFont = "default";
+const VIEW_VISITOR_KEY = "core_view_visitor_key";
+const VIEW_SESSION_KEY = "core_view_session_id";
+const VIEW_TRACKED_CLASS = "view-tracked";
+const VIEW_MIN_VISIBLE_MS = 1200;
+const VIEW_MIN_TOTAL_MS = 2000;
+const VIEW_HEARTBEAT_MS = 5000;
+const viewState = new Map();
+let postViewObserver = null;
+let postViewFlushTimer = null;
+let postViewMuted = false;
+
+function getOrCreateVisitorKey() {
+  let key = localStorage.getItem(VIEW_VISITOR_KEY);
+  if (!key) {
+    key = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    localStorage.setItem(VIEW_VISITOR_KEY, key);
+  }
+  return key;
+}
+
+function getOrCreateViewSessionId() {
+  let key = sessionStorage.getItem(VIEW_SESSION_KEY);
+  if (!key) {
+    key = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    sessionStorage.setItem(VIEW_SESSION_KEY, key);
+  }
+  return key;
+}
+
+async function sendPostViewEvent(postId, payload) {
+  if (!postId || postViewMuted) return;
+  const body = JSON.stringify({
+    ...payload,
+    sessionId: getOrCreateViewSessionId(),
+    visitorKey: getOrCreateVisitorKey()
+  });
+  try {
+    if (navigator.sendBeacon) {
+      const ok = navigator.sendBeacon(`/posts/${postId}/view`, new Blob([body], { type: "application/json" }));
+      if (ok) return;
+    }
+  } catch {}
+
+  try {
+    await fetch(`/posts/${postId}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      keepalive: true,
+      body
+    });
+  } catch {}
+}
+
+function getVisibleRatio(el) {
+  const rect = el.getBoundingClientRect();
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const visibleWidth = Math.max(0, Math.min(rect.right, vw) - Math.max(rect.left, 0));
+  const visibleHeight = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
+  const visibleArea = visibleWidth * visibleHeight;
+  const totalArea = Math.max(1, rect.width * rect.height);
+  return Math.max(0, Math.min(1, visibleArea / totalArea));
+}
+
+function ensurePostTracking(postEl) {
+  if (!postEl || postEl.classList.contains(VIEW_TRACKED_CLASS)) return;
+  postEl.classList.add(VIEW_TRACKED_CLASS);
+  viewState.set(postEl.dataset.postId, {
+    startedAt: 0,
+    lastTick: 0,
+    visibleMs: 0,
+    watchMs: 0,
+    inView: false,
+    seenOnce: false,
+    lastSentAt: 0
+  });
+  if (postViewObserver) postViewObserver.observe(postEl);
+}
+
+function flushPostView(postId, eventType = "heartbeat", completed = false) {
+  const state = viewState.get(String(postId));
+  if (!state) return;
+  const now = performance.now();
+  if (state.inView && state.startedAt) {
+    const delta = Math.max(0, now - state.lastTick);
+    state.visibleMs += delta;
+    state.watchMs += delta;
+    state.lastTick = now;
+  }
+  const payload = {
+    eventType,
+    visibleMs: Math.round(state.visibleMs),
+    watchMs: Math.round(state.watchMs),
+    viewportRatio: state.ratio || 0,
+    completed
+  };
+  state.lastSentAt = now;
+  if (completed || payload.visibleMs >= VIEW_MIN_VISIBLE_MS) {
+    sendPostViewEvent(postId, payload);
+  }
+}
+
+function startPostViewObserver() {
+  if (postViewObserver) return;
+  postViewObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const postEl = entry.target;
+      const postId = postEl.dataset.postId;
+      if (!postId) return;
+      const state = viewState.get(postId) || { startedAt: 0, lastTick: 0, visibleMs: 0, watchMs: 0, inView: false, seenOnce: false, lastSentAt: 0 };
+      state.ratio = entry.intersectionRatio || getVisibleRatio(postEl);
+      if (entry.isIntersecting && state.ratio >= 0.6) {
+        if (!state.inView) {
+          state.inView = true;
+          state.startedAt = performance.now();
+          state.lastTick = state.startedAt;
+          if (!state.seenOnce) {
+            state.seenOnce = true;
+            sendPostViewEvent(postId, { eventType: "impression", visibleMs: 0, watchMs: 0, viewportRatio: state.ratio, completed: false });
+          }
+        }
+      } else if (state.inView) {
+        const now = performance.now();
+        const delta = Math.max(0, now - state.lastTick);
+        state.visibleMs += delta;
+        state.watchMs += delta;
+        state.inView = false;
+        state.lastTick = now;
+        if (state.visibleMs >= VIEW_MIN_VISIBLE_MS && now - state.lastSentAt > 300) {
+          sendPostViewEvent(postId, { eventType: "leave", visibleMs: Math.round(state.visibleMs), watchMs: Math.round(state.watchMs), viewportRatio: state.ratio, completed: state.watchMs >= VIEW_MIN_TOTAL_MS });
+        }
+      }
+      viewState.set(postId, state);
+    });
+  }, { threshold: [0, 0.25, 0.6, 1] });
+
+  setInterval(() => {
+    document.querySelectorAll(".post").forEach(ensurePostTracking);
+    viewState.forEach((state, postId) => {
+      if (!state.inView || !state.startedAt) return;
+      const now = performance.now();
+      if (now - state.lastSentAt < VIEW_HEARTBEAT_MS) return;
+      flushPostView(postId, "heartbeat", state.watchMs >= VIEW_MIN_TOTAL_MS);
+    });
+  }, VIEW_HEARTBEAT_MS);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      viewState.forEach((state, postId) => {
+        if (state.inView) flushPostView(postId, "leave", state.watchMs >= VIEW_MIN_TOTAL_MS);
+      });
+    }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    viewState.forEach((state, postId) => {
+      if (state.inView) flushPostView(postId, "complete", state.watchMs >= VIEW_MIN_TOTAL_MS);
+    });
+  });
+}
 
 // Core Flow elements
 const fontStylePicker = document.getElementById("fontStylePicker");
@@ -601,8 +762,16 @@ function createPostElement(post) {
 
   // Verified badge only for Core Flow users
   const verifiedBadge = isPremiumPost ? `<span class="verified-check" title="Core Flow"></span>` : "";
+  const repostIconImg = `<img src="assets/repost-icon.png" alt="" aria-hidden="true" class="repost-icon-img" />`;
+  const repostHeader = post.is_repost ? `
+    <div class="post-repost-label">
+      ${repostIconImg}
+      <span>${post.reposted_by_name || (currentUser?.display_name || currentUser?.username || "You")} reposted</span>
+    </div>
+  ` : "";
 
   postElement.innerHTML = `
+    ${repostHeader}
     <div class="post-head">
       <div class="mini-avatar" style="cursor:pointer" data-user-id="${post.user_id}">${avatarInner}</div>
       <div class="post-user-info" style="cursor:pointer" data-user-id="${post.user_id}">
@@ -613,9 +782,10 @@ function createPostElement(post) {
       </div>
       <div class="post-more">⋯</div>
     </div>
-    <div class="post-body"></div>
-    <img class="post-image hidden" alt="Post image" />
-    <footer class="post-foot">
+  <div class="post-body"></div>
+  <img class="post-image hidden" alt="Post image" />
+  <video class="post-video hidden" playsinline muted loop preload="metadata"></video>
+  <footer class="post-foot">
       <span class="action-like ${post.has_liked ? "liked" : ""}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="action-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
         <span class="likes-count">${formatNumber(post.likes || 0)}</span>
@@ -624,13 +794,17 @@ function createPostElement(post) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="action-icon"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
         <span class="comments-count">${formatNumber(post.comment_count || 0)}</span>
       </span>
-      <span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="action-icon"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-        0
+      <span class="action-repost">
+        ${repostIconImg}
+        <span class="repost-count">${formatNumber(post.repost_count || 0)}</span>
       </span>
-      ${isOwner ? '<button class="action-delete" style="margin-left:auto;">Delete</button>' : ""}
+      <span class="action-views">
+        <span class="views-label">Views</span>
+        <span class="views-count">0</span>
+      </span>
+      ${isOwner ? '<button class="action-delete">Delete</button>' : ""}
       ${!isOwner && currentUser && (currentUser.role === 'admin' || currentUser.role === 'ceo' || currentUser.role === 'mod') 
-        ? '<button class="action-delete-admin" style="margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;font-size:12px;font-weight:700;">Delete</button>' 
+        ? '<button class="action-delete-admin">Delete</button>' 
         : ''}
     </footer>
     <div class="comments-container hidden"></div>
@@ -655,7 +829,72 @@ function createPostElement(post) {
     });
   });
 
+  const repostBtn = postElement.querySelector(".action-repost");
+  if (repostBtn) {
+    const countEl = repostBtn.querySelector(".repost-count");
+    repostBtn.dataset.reposted = post.has_reposted ? "1" : "0";
+    repostBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!currentUser) {
+        window.location.href = "login.html";
+        return;
+      }
+      if (repostBtn.dataset.busy === "1") return;
+      repostBtn.dataset.busy = "1";
+      repostBtn.classList.add("busy");
+      const previousCount = countEl ? Number((countEl.textContent || "0").replace(/[^\d]/g, "")) || 0 : 0;
+      const isCurrentlyReposted = repostBtn.dataset.reposted === "1";
+      try {
+        const res = await fetch(`${API_URL}/posts/${post.id}/repost`, {
+          method: isCurrentlyReposted ? "DELETE" : "POST",
+          credentials: "include"
+        });
+        if (!res.ok) {
+          const errorMessage = await getErrorMessage(
+            res,
+            isCurrentlyReposted ? "Unrepost failed" : "Repost failed"
+          );
+          if (!isCurrentlyReposted && /already reposted/i.test(errorMessage)) {
+            const toggleRes = await fetch(`${API_URL}/posts/${post.id}/repost`, {
+              method: "DELETE",
+              credentials: "include"
+            });
+            if (toggleRes.ok) {
+              const toggleData = await toggleRes.json();
+              if (countEl) {
+                countEl.textContent = formatNumber(Number(toggleData.repost_count || 0));
+              }
+              repostBtn.dataset.reposted = "0";
+              showFeedback("Unreposted!", "success");
+              return;
+            }
+          }
+          showFeedback(errorMessage, "error");
+          return;
+        }
+        const data = await res.json();
+        if (countEl) {
+          const nextCount = Number.isFinite(Number(data.repost_count))
+            ? Number(data.repost_count)
+            : (isCurrentlyReposted ? Math.max(0, previousCount - 1) : previousCount + 1);
+          countEl.textContent = formatNumber(nextCount);
+        }
+        repostBtn.dataset.reposted = isCurrentlyReposted ? "0" : "1";
+        showFeedback(isCurrentlyReposted ? "Unreposted!" : "Reposted!", "success");
+      } catch (err) {
+        showFeedback(isCurrentlyReposted ? "Unrepost failed" : "Repost failed", "error");
+        if (countEl) {
+          countEl.textContent = formatNumber(previousCount);
+        }
+      } finally {
+        repostBtn.dataset.busy = "0";
+        repostBtn.classList.remove("busy");
+      }
+    });
+  }
+
   const postImageElement = postElement.querySelector(".post-image");
+  const postVideoElement = postElement.querySelector(".post-video");
   if (post.image_path) {
     postImageElement.src = post.image_path.startsWith('http') ? post.image_path : `${API_URL}${post.image_path}`;
     postImageElement.classList.remove("hidden");
@@ -666,7 +905,35 @@ function createPostElement(post) {
     });
   }
 
+  const videoPath = post.video_path && String(post.video_path).trim();
+  if (videoPath) {
+    postVideoElement.src = videoPath.startsWith('http') ? videoPath : `${API_URL}${videoPath}`;
+    postVideoElement.classList.remove("hidden");
+    postVideoElement.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (postVideoElement.paused) {
+        postVideoElement.play().catch(() => {});
+      } else {
+        postVideoElement.pause();
+      }
+    });
+    postVideoElement.addEventListener("play", () => {
+      sendPostViewEvent(post.id, { eventType: "heartbeat", visibleMs: 0, watchMs: 0, viewportRatio: getVisibleRatio(postElement), completed: false });
+    });
+  }
+
   postElement.querySelector(".post-body").textContent = post.content;
+
+  // Load live analytics after the card is on the page.
+  queueMicrotask(async () => {
+    try {
+      const res = await fetch(`${API_URL}/posts/${post.id}/views`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const viewsEl = postElement.querySelector(".views-count");
+      if (viewsEl) viewsEl.textContent = formatNumber(Number(data.views || 0));
+    } catch {}
+  });
 
   // Render Poll if exists
   if (post.poll) {
@@ -745,12 +1012,15 @@ function createPostElement(post) {
 
 async function loadFeed() {
   try {
-    const endpoint = feedMode === "following" ? "/feed/following" : "/posts";
-    const response = await fetch(`${API_URL}${endpoint}`);
+    const endpoint = feedMode === "following" ? "/feed/following" : "/feed/ranked";
+    const response = await fetch(`${API_URL}${endpoint}?_feed=${Date.now()}`, {
+      credentials: "include",
+      cache: "no-store"
+    });
     
     if (response.status === 401 && feedMode === "following") {
       showFeedback("Log in to see your personalized feed.", "info");
-      switchFeedMode("explore");
+      switchFeedMode("for_you");
       return;
     }
     
@@ -773,6 +1043,7 @@ async function loadFeed() {
       el.classList.add("post-animate-in");
       el.style.animationDelay = `${Math.min(index * 0.05, 0.4)}s`;
       postsList.appendChild(el);
+      ensurePostTracking(el);
     });
     replayStaggeredAnimations(postsList, ".post");
   } catch (error) {
@@ -782,7 +1053,7 @@ async function loadFeed() {
 
 function switchFeedMode(mode) {
   feedMode = mode;
-  tabExplore.classList.toggle("active", mode === "explore");
+  tabExplore.classList.toggle("active", mode === "for_you");
   tabFollowing.classList.toggle("active", mode === "following");
   loadFeed();
 }
@@ -862,6 +1133,8 @@ async function showProfile(userId) {
   }
   hideAllViews();
   profileView.classList.remove("hidden");
+  if (profileView) profileView.scrollTop = 0;
+  if (profileContent) profileContent.scrollTop = 0;
   navProfile.classList.add("active");
   setMobileNavActive("mobNavProfile");
 
@@ -977,6 +1250,7 @@ async function showProfile(userId) {
           el.classList.add("post-animate-in");
           el.style.animationDelay = `${Math.min(index * 0.05, 0.4)}s`;
           profilePosts.appendChild(el);
+          ensurePostTracking(el);
         });
         replayStaggeredAnimations(profilePosts, ".post");
       }
@@ -1109,6 +1383,7 @@ async function showMessagesList() {
         : (c.emoji || "👤");
       const preview = (c.last_message || "").replace(/\s+/g, " ").trim();
       const time = c.last_message_at ? timeAgo(new Date(c.last_message_at)) : "";
+      const status = c.last_message_seen_at ? "Seen" : (c.last_message_delivered_at ? "Delivered" : "");
       row.innerHTML = `
         <div class="messages-list-avatar">${avatar}</div>
         <div class="messages-list-body">
@@ -1116,7 +1391,10 @@ async function showMessagesList() {
             <span class="messages-list-name">${name}</span>
             <span class="messages-list-time">${time}</span>
           </div>
-          <div class="messages-list-preview">${preview || "No messages yet"}</div>
+          <div class="messages-list-preview">
+            <span class="messages-list-preview-text">${preview || "No messages yet"}</span>
+            ${status ? `<span class="messages-list-status">${status}</span>` : ""}
+          </div>
         </div>
       `;
       row.addEventListener("click", () => MapsTo(`messages/${c.user_id}`));
@@ -1406,7 +1684,9 @@ async function showSinglePost(postId) {
     
     postsList.innerHTML = "";
     if (post) {
-      postsList.appendChild(createPostElement(post));
+      const el = createPostElement(post);
+      postsList.appendChild(el);
+      ensurePostTracking(el);
     } else {
       postsList.innerHTML = `<div style="padding: 40px; color: var(--muted); text-align: center;">Post not found.</div>`;
     }
@@ -2093,6 +2373,12 @@ window.addEventListener("resize", placeComposer);
 
 const feedScrollEl = document.getElementById("feedView");
 if (feedScrollEl) {
+  const resetFeedHeaderState = () => {
+    if (window.innerWidth <= 900) {
+      feedScrollEl.classList.remove("composer-hidden");
+    }
+  };
+
   feedScrollEl.addEventListener("scroll", () => {
     // Only apply composer-hidden hide/show on desktop (composer is in sticky header there)
     if (window.innerWidth <= 900) return;
@@ -2106,6 +2392,10 @@ if (feedScrollEl) {
     }
     lastFeedScrollTop = st;
   }, { passive: true });
+
+  feedScrollEl.addEventListener("touchend", resetFeedHeaderState, { passive: true });
+  feedScrollEl.addEventListener("pointerup", resetFeedHeaderState, { passive: true });
+  feedScrollEl.addEventListener("scrollend", resetFeedHeaderState);
 }
 
 async function toggleComments(postId, postElement) {
@@ -2550,7 +2840,7 @@ if (navProfile) navProfile.addEventListener("click", (e) => {
 });
 
 // Feed Mode Listeners
-if (tabExplore) tabExplore.addEventListener("click", () => switchFeedMode("explore"));
+if (tabExplore) tabExplore.addEventListener("click", () => switchFeedMode("for_you"));
 if (tabFollowing) tabFollowing.addEventListener("click", () => switchFeedMode("following"));
 
 // Core Flow Sidebar Link
@@ -2962,6 +3252,7 @@ async function handlePostMenuAction(postElement, action, postId) {
 
 
 (async function init() {
+  startPostViewObserver();
   await fetchCurrentUser();
   await setupPushNotifications();
   initKeyboardViewportFix();
@@ -2997,6 +3288,10 @@ async function handlePostMenuAction(postElement, action, postId) {
 
 let socket;
 let currentChatUserId = null;
+let typingIndicatorTimer = null;
+let typingStateTimeout = null;
+let activeTypingFromUserId = null;
+let chatSeenScrollHandlerBound = false;
 
 function initSocket() {
   if (!socket && currentUser) {
@@ -3019,13 +3314,95 @@ function initSocket() {
       if (currentChatUserId && (msg.sender_id === Number(currentChatUserId) || msg.receiver_id === Number(currentChatUserId))) {
         appendMessage(msg);
         scrollToBottom();
+        requestAnimationFrame(() => {
+          markVisibleMessagesSeen();
+        });
       } else {
         if (msg.sender_id !== currentUser.id) {
           showFeedback("New message received", "info");
         }
       }
     });
+
+    socket.on('typing', ({ fromUserId, isTyping }) => {
+      if (!currentChatUserId || Number(currentChatUserId) !== Number(fromUserId)) return;
+      activeTypingFromUserId = isTyping ? Number(fromUserId) : null;
+      renderTypingIndicator(isTyping);
+    });
+
+    socket.on('message_state_update', ({ messageId, seen_at, delivered_at, chatUserId }) => {
+      if (!currentChatUserId || Number(currentChatUserId) !== Number(chatUserId)) return;
+      updateMessageState(messageId, { seen_at, delivered_at });
+    });
   }
+}
+
+function renderTypingIndicator(isTyping) {
+  const chatMessages = document.getElementById("chatMessages");
+  if (!chatMessages) return;
+  let indicator = document.getElementById("typingIndicator");
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.id = "typingIndicator";
+    indicator.style.cssText = "padding:10px 16px;color:var(--muted);font-size:12px;text-align:left;";
+  }
+  indicator.textContent = isTyping ? "Typing..." : "";
+  indicator.style.display = isTyping ? "block" : "none";
+  chatMessages.appendChild(indicator);
+}
+
+function getMessageStatusLabel(msg) {
+  if (msg.seen_at) return "Seen";
+  if (msg.delivered_at) return "Delivered";
+  return "Sent";
+}
+
+function syncLatestOutgoingMessageStatus() {
+  const bubbles = Array.from(document.querySelectorAll('.message-bubble[data-message-id]'));
+  const outgoing = bubbles.filter((bubble) => Number(bubble.dataset.senderId) === Number(currentUser?.id));
+  bubbles.forEach((bubble) => {
+    const status = bubble.querySelector(".message-status");
+    if (status) status.remove();
+  });
+
+  if (outgoing.length === 0) return;
+
+  const latest = outgoing[outgoing.length - 1];
+  const messageId = Number(latest.dataset.messageId);
+  const rawMsg = latest.__messageData || null;
+  const statusText = rawMsg ? getMessageStatusLabel(rawMsg) : "Sent";
+  const status = document.createElement("span");
+  status.className = "message-status";
+  status.style.cssText = "font-size: 11px; color: var(--muted); margin-top: 4px;";
+  status.textContent = statusText;
+  latest.appendChild(status);
+  latest.dataset.messageStatus = statusText;
+  latest.dataset.messageId = String(messageId);
+}
+
+function moveTypingIndicatorToEnd() {
+  const chatMessages = document.getElementById("chatMessages");
+  const indicator = document.getElementById("typingIndicator");
+  if (chatMessages && indicator) {
+    chatMessages.appendChild(indicator);
+  }
+}
+
+function updateMessageState(messageId, state) {
+  const bubble = document.querySelector(`.message-bubble[data-message-id="${messageId}"]`);
+  if (!bubble) return;
+  const status = bubble.querySelector(".message-status");
+  if (!status) return;
+  if (state.seen_at) status.textContent = "Seen";
+  else if (state.delivered_at) status.textContent = "Delivered";
+  syncLatestOutgoingMessageStatus();
+  moveTypingIndicatorToEnd();
+}
+
+function getMessageStatusLabel(msg) {
+  if (msg.seen_at) return "Seen";
+  if (msg.delivered_at) return "Delivered";
+  return "Sent";
 }
 
 async function showMessages(friendId) {
@@ -3061,9 +3438,22 @@ async function showMessages(friendId) {
     } else {
       messages.forEach(appendMessage);
       scrollToBottom();
+      setTimeout(markVisibleMessagesSeen, 150);
+      syncLatestOutgoingMessageStatus();
+      moveTypingIndicatorToEnd();
     }
   } catch(e) {
     chatMessages.innerHTML = `<div style="text-align:center; color: var(--muted); padding: 20px;">Error loading messages.</div>`;
+  }
+
+  if (chatMessages && !chatSeenScrollHandlerBound) {
+    chatSeenScrollHandlerBound = true;
+    chatMessages.addEventListener("scroll", () => {
+      markVisibleMessagesSeen();
+    }, { passive: true });
+    chatMessages.addEventListener("pointerup", () => {
+      setTimeout(markVisibleMessagesSeen, 50);
+    }, { passive: true });
   }
 }
 
@@ -3079,28 +3469,38 @@ function appendMessage(msg) {
   const previousBubble = chatMessages.lastElementChild;
   const previousSenderId = previousBubble ? Number(previousBubble.dataset.senderId) : null;
   const previousDateMs = previousBubble ? Number(previousBubble.dataset.createdAtMs) : null;
+  const timeGapMs = previousDateMs ? (messageDate.getTime() - previousDateMs) : Number.POSITIVE_INFINITY;
+  const sameSenderAsPrevious = previousBubble && previousSenderId === msg.sender_id;
+  const isContinuation = sameSenderAsPrevious && timeGapMs <= 2 * 60 * 1000;
   const shouldShowTime = !previousBubble
-    || previousSenderId !== msg.sender_id
+    || !sameSenderAsPrevious
     || !previousDateMs
-    || (messageDate.getTime() - previousDateMs) > 5 * 60 * 1000;
+    || timeGapMs > 2 * 60 * 1000;
   const div = document.createElement("div");
   div.className = "message-bubble";
   div.dataset.senderId = String(msg.sender_id);
+  div.dataset.messageId = String(msg.id);
   div.dataset.createdAtMs = String(messageDate.getTime());
   div.style.display = "flex";
   div.style.flexDirection = "column";
   div.style.alignItems = isMe ? "flex-end" : "flex-start";
-  div.style.marginBottom = shouldShowTime ? "12px" : "4px";
+  div.style.marginBottom = isContinuation ? "0px" : (shouldShowTime ? "10px" : "3px");
   div.style.paddingLeft = isMe ? "0" : "8px";
   div.style.paddingRight = isMe ? "8px" : "0";
 
   div.innerHTML = `
-    ${shouldShowTime ? `<span style="font-size: 10px; color: var(--muted); margin: 0 0 3px; opacity: 0.7;">${messageTime}</span>` : ""}
+    ${shouldShowTime ? `<span style="font-size: 10px; color: var(--muted); margin: 0 0 1px; opacity: 0.7;">${messageTime}</span>` : ""}
     <div style="max-width: min(70%, 520px); padding: 10px 14px; border-radius: 18px; background: ${isMe ? '#7c3aed' : 'var(--panel)'}; color: #fff; font-size: 14px; line-height: 1.4; word-wrap: break-word;">
       ${msg.content}
     </div>
   `;
+  div.__messageData = msg;
   chatMessages.appendChild(div);
+  syncLatestOutgoingMessageStatus();
+  moveTypingIndicatorToEnd();
+  if (!isMe) {
+    setTimeout(markVisibleMessagesSeen, 100);
+  }
 }
 
 function scrollToBottom() {
@@ -3108,6 +3508,28 @@ function scrollToBottom() {
   if (chatMessages) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
+}
+
+function markVisibleMessagesSeen() {
+  if (!socket || !currentChatUserId) return;
+  const chatMessages = document.getElementById("chatMessages");
+  if (!chatMessages) return;
+  const containerRect = chatMessages.getBoundingClientRect();
+  const bubbles = document.querySelectorAll('.message-bubble[data-message-id]');
+  bubbles.forEach((bubble) => {
+    const senderId = Number(bubble.dataset.senderId);
+    const messageId = Number(bubble.dataset.messageId);
+    if (senderId === Number(currentUser.id)) return;
+    if (bubble.dataset.seenSent === "1") return;
+    const rect = bubble.getBoundingClientRect();
+    const visible = rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+    if (visible) {
+      bubble.dataset.seenSent = "1";
+      socket.emit("message_seen", { messageId, chatUserId: Number(currentChatUserId) });
+      const status = bubble.querySelector(".message-status");
+      if (status) status.textContent = "Seen";
+    }
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -3128,6 +3550,20 @@ document.addEventListener("DOMContentLoaded", () => {
       input.value = "";
     });
   }
+});
+
+document.addEventListener("input", (e) => {
+  const input = e.target;
+  if (!input || input.id !== "chatInput" || !socket || !currentChatUserId || !currentUser) return;
+  socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: true });
+  clearTimeout(typingStateTimeout);
+  typingStateTimeout = setTimeout(() => {
+    socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
+  }, 900);
+});
+
+window.addEventListener("blur", () => {
+  if (socket && currentChatUserId) socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
 });
 
 if (enablePushBtn) {

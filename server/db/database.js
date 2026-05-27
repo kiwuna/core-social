@@ -87,15 +87,30 @@ const initDb = async () => {
         content TEXT NOT NULL,
         likes INTEGER NOT NULL DEFAULT 0,
         image_path TEXT,
+        video_path TEXT,
+        media_type TEXT DEFAULT 'text',
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         font_style TEXT DEFAULT 'default',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await runAlter("ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_path TEXT");
+    await runAlter("ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'text'");
 
     // Likes table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS likes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, post_id)
+      )
+    `);
+
+    // Reposts table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reposts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
@@ -178,9 +193,13 @@ const initDb = async () => {
         sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
+        delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+        seen_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await runAlter('ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL');
+    await runAlter('ALTER TABLE messages ADD COLUMN IF NOT EXISTS seen_at TIMESTAMP WITH TIME ZONE DEFAULT NULL');
 
     // Push subscriptions table
     await pool.query(`
@@ -195,6 +214,8 @@ const initDb = async () => {
       )
     `);
     await runAlter('CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id ON push_subscriptions(user_id)');
+    await runAlter('CREATE INDEX IF NOT EXISTS idx_reposts_user_id ON reposts(user_id)');
+    await runAlter('CREATE INDEX IF NOT EXISTS idx_reposts_post_id ON reposts(post_id)');
 
     // Notifications table
     await pool.query(`
@@ -208,6 +229,57 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Post analytics tables
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS post_impressions (
+        id BIGSERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        visitor_key TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        session_id TEXT,
+        first_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        visible_ms BIGINT NOT NULL DEFAULT 0,
+        is_viewed BOOLEAN NOT NULL DEFAULT FALSE,
+        device_hint TEXT,
+        ip_hash TEXT,
+        user_agent_hash TEXT,
+        UNIQUE(post_id, visitor_key)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS post_view_events (
+        id BIGSERIAL PRIMARY KEY,
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        visitor_key TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        event_type TEXT NOT NULL,
+        visible_ms INTEGER NOT NULL DEFAULT 0,
+        watch_ms INTEGER NOT NULL DEFAULT 0,
+        viewport_ratio REAL DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS post_view_aggregates (
+        post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        day DATE NOT NULL,
+        impressions BIGINT NOT NULL DEFAULT 0,
+        unique_views BIGINT NOT NULL DEFAULT 0,
+        views BIGINT NOT NULL DEFAULT 0,
+        watch_ms BIGINT NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (post_id, day)
+      )
+    `);
+
+    await runAlter('CREATE INDEX IF NOT EXISTS idx_post_impressions_post_id ON post_impressions(post_id)');
+    await runAlter('CREATE INDEX IF NOT EXISTS idx_post_impressions_visitor_key ON post_impressions(visitor_key)');
+    await runAlter('CREATE INDEX IF NOT EXISTS idx_post_view_events_post_id_created_at ON post_view_events(post_id, created_at DESC)');
+    await runAlter('CREATE INDEX IF NOT EXISTS idx_post_view_aggregates_day ON post_view_aggregates(day)');
 
     // Session table (for connect-pg-simple)
     await pool.query(`

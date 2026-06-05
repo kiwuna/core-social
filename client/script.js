@@ -527,7 +527,7 @@ function updateAuthUI() {
 
 async function fetchCurrentUser() {
   try {
-    const res = await fetch("/auth/me");
+    const res = await fetch("/auth/me", { credentials: "include" });
     if (res.ok) {
       const data = await res.json();
       currentUser = data.user;

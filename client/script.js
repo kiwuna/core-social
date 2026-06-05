@@ -446,28 +446,24 @@ function updateAuthUI() {
     // Show font picker for premium users
     if (fontStylePicker) fontStylePicker.classList.toggle('hidden', !currentUser.is_premium);
 
-    // Update settings modal premium states
-    const isPremium = !!currentUser.is_premium;
-
     if (avatarUploadArea) {
-      avatarUploadArea.classList.toggle('locked', !isPremium);
-      avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+      avatarUploadArea.classList.remove('locked');
+      avatarUploadArea.style.pointerEvents = 'auto';
     }
     if (avatarLockedMsg) {
-      avatarLockedMsg.classList.toggle('hidden', isPremium);
-      if (!isPremium) {
-      avatarLockedMsg.innerHTML = '<span>??</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
-      }
+      avatarLockedMsg.classList.add('hidden');
     }
 
     if (bannerUploadArea) {
+      const isPremium = !!currentUser.is_premium;
       bannerUploadArea.classList.toggle('locked', !isPremium);
       bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
     }
     if (bannerLockedMsg) {
+      const isPremium = !!currentUser.is_premium;
       bannerLockedMsg.classList.toggle('hidden', isPremium);
       if (!isPremium) {
-      bannerLockedMsg.innerHTML = '<span>??</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
+        bannerLockedMsg.innerHTML = '<span>🔒</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
       }
     }
 
@@ -2028,11 +2024,7 @@ if (postForm) {
 
 if (pickImageButton) {
   pickImageButton.addEventListener("click", () => {
-    if (currentUser && currentUser.is_premium) {
-      imageInput.click();
-    } else {
-      if (coreFlowModal) coreFlowModal.classList.add('show');
-    }
+    imageInput.click();
   });
 }
 if (imageInput) {
@@ -2573,14 +2565,11 @@ function switchSettingsTab(tabId) {
   const isSynced = true;
   
   if (avatarUploadArea) {
-    avatarUploadArea.classList.toggle('locked', !isPremium);
-    avatarUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
+    avatarUploadArea.classList.remove('locked');
+    avatarUploadArea.style.pointerEvents = 'auto';
   }
   if (avatarLockedMsg) {
-    avatarLockedMsg.classList.toggle('hidden', isPremium);
-    if (!isPremium) {
-      avatarLockedMsg.innerHTML = '<span>??</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.';
-    }
+    avatarLockedMsg.classList.add('hidden');
   }
   
   if (bannerUploadArea) {
@@ -2711,11 +2700,6 @@ if (avatarFileInput) {
   avatarFileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
-    if (!currentUser || !currentUser.is_premium) {
-      showFeedback('Custom avatars require Core Flow.', 'info');
-      return;
-    }
 
     const formData = new FormData();
     formData.append('avatar', file);

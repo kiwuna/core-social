@@ -235,7 +235,7 @@ router.get("/users/:id", async (req, res, next) => {
   }
 });
 
-// Upload Avatar (Premium only)
+// Upload Avatar (free for all users)
 router.post("/upload-avatar", isAuthenticated, uploadAvatar.single("avatar"), async (req, res, next) => {
   const db = req.app.locals.db;
   const userId = req.session.userId;
@@ -243,13 +243,10 @@ router.post("/upload-avatar", isAuthenticated, uploadAvatar.single("avatar"), as
   if (!req.file) return res.status(400).json({ error: "No file uploaded." });
 
   try {
-    const result = await db.query("SELECT is_premium, avatar_path FROM users WHERE id = $1", [userId]);
+    const result = await db.query("SELECT avatar_path FROM users WHERE id = $1", [userId]);
     const user = result.rows[0];
     
     if (!user) return res.status(404).json({ error: "User not found." });
-    if (!user.is_premium) {
-      return res.status(403).json({ error: "Custom avatars require Core Flow." });
-    }
 
     // req.file.path contains the Cloudinary URL
     const avatarPath = req.file.path; 

@@ -19,7 +19,6 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const isProduction = process.env.NODE_ENV === "production";
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -161,8 +160,7 @@ app.use(
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
       httpOnly: true, // Security: prevents client-side JS from reading the cookie
-      sameSite: isProduction ? "none" : "lax",
-      secure: isProduction,
+      sameSite: "lax",
     },
   })
 );

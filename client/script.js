@@ -445,6 +445,7 @@ function updateAuthUI() {
     }
     // Show font picker for premium users
     if (fontStylePicker) fontStylePicker.classList.toggle('hidden', !currentUser.is_premium);
+    const isPremium = !!currentUser.is_premium;
 
     if (avatarUploadArea) {
       avatarUploadArea.classList.remove('locked');
@@ -455,12 +456,10 @@ function updateAuthUI() {
     }
 
     if (bannerUploadArea) {
-      const isPremium = !!currentUser.is_premium;
       bannerUploadArea.classList.toggle('locked', !isPremium);
       bannerUploadArea.style.pointerEvents = isPremium ? 'auto' : 'none';
     }
     if (bannerLockedMsg) {
-      const isPremium = !!currentUser.is_premium;
       bannerLockedMsg.classList.toggle('hidden', isPremium);
       if (!isPremium) {
         bannerLockedMsg.innerHTML = '<span>🔒</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.';
@@ -468,7 +467,7 @@ function updateAuthUI() {
     }
 
     if (avatarPreview) {
-      if (isPremium && currentUser.avatar_path) {
+      if (currentUser.avatar_path) {
         avatarPreview.innerHTML = `<img src="${currentUser.avatar_path}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
       } else {
         avatarPreview.textContent = currentUser.emoji || "👤";

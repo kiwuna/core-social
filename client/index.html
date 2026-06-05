@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -78,17 +78,17 @@
           <div id="unreadBadge" aria-hidden="true" style="position: absolute; top: 50%; right: 16px; width: 10px; height: 10px; background: #ff2b52; border-radius: 50%; display: none; border: 2px solid var(--panel); z-index: 5; box-shadow: 0 0 0 2px rgba(255, 43, 82, 0.18); transform: translateY(-50%);"></div>
         </a>
         <a id="navProfile" class="nav-item" href="#">
-          <span class="ico" id="userEmojiLarge">👤</span> 
+          <span class="ico" id="userEmojiLarge">??</span> 
           <div style="display: flex; flex-direction: column; line-height: 1.2;">
             <span id="userNameDisplay">Profile</span>
             <span id="userHandleDisplay" style="font-size: 11px; opacity: 0.5;">@anonymous</span>
           </div>
         </a>
-        <a id="navAdmin" class="nav-item hidden" href="/admin"><span class="ico">👑</span> <span>Admin Panel</span></a>
+        <a id="navAdmin" class="nav-item hidden" href="/admin"><span class="ico">??</span> <span>Admin Panel</span></a>
       </nav>
 
       <div class="sidebar-footer"> 
-        <a href="#" id="navCoreFlow" class="footer-link"><span class="ico">⭐</span> <span>CORE FLOW</span></a>
+        <a href="#" id="navCoreFlow" class="footer-link"><span class="ico">?</span> <span>CORE FLOW</span></a>
         <a href="#" id="logoutBtn" class="footer-link hidden"><span class="ico"><img src="./assets/logout.png" width="22" height="22"></span> <span>Logout</span></a>
         <a href="login.html" id="loginLink" class="footer-link"><span class="ico"></span> <span>Login</span></a>
       </div>
@@ -104,7 +104,7 @@
         <div id="stickyHeader" class="sticky-header feed-view-header">
           <div class="feed-tabs-container feed-animate-tabs">
             <button id="mobileMenuBtn" class="mobile-menu-btn">
-              <span id="userEmojiMobile" class="mini-avatar">👻</span>
+              <span id="userEmojiMobile" class="mini-avatar">??</span>
             </button>
             <div class="tabs">
               <button id="tabExplore" class="tab active">For You</button>
@@ -117,7 +117,7 @@
           <div class="composer-container feed-animate-composer composer-desktop">
             <form id="postForm" class="composer" autocomplete="off">
               <div class="composer-top">
-                <span id="userEmojiMini" class="mini-avatar">👻</span>
+                <span id="userEmojiMini" class="mini-avatar">??</span>
                 <input
                   id="postInput"
                   type="text"
@@ -137,9 +137,9 @@
                 <!-- Font Style Picker (Core Flow only) -->
                 <div id="fontStylePicker" class="font-style-picker hidden">
                   <button type="button" class="font-btn active" data-font="default" title="Default">Aa</button>
-                  <button type="button" class="font-btn" data-font="serif" title="Serif">𝐒</button>
-                  <button type="button" class="font-btn" data-font="mono" title="Monospace">⌨</button>
-                  <button type="button" class="font-btn" data-font="bold" title="Bold">𝗕</button>
+                  <button type="button" class="font-btn" data-font="serif" title="Serif">??</button>
+                  <button type="button" class="font-btn" data-font="mono" title="Monospace">?</button>
+                  <button type="button" class="font-btn" data-font="bold" title="Bold">??</button>
                 </div>
                 <button type="submit" class="send">Post</button>
               </div>
@@ -247,7 +247,7 @@
             </div>
             <div class="notifications-header-actions">
               <button class="btn-reports-folder hidden" id="btnReportsFolder">
-                <span class="ico">📁</span>
+                <span class="ico">??</span>
                 <span>Reports</span>
               </button>
               <button class="btn-clear-all" id="btnClearAll">Clear All</button>
@@ -325,19 +325,19 @@
         <div class="settings-title">Settings</div>
         <nav class="settings-nav">
           <button class="settings-nav-item active" data-tab="account">
-            <span class="ico">👤</span> Account
+            <span class="ico">??</span> Account
           </button>
           <button class="settings-nav-item" data-tab="design">
-            <span class="ico">🎨</span> Design
+            <span class="ico">??</span> Design
           </button>
           <button class="settings-nav-item" data-tab="security">
-            <span class="ico">🛡️</span> Security
+            <span class="ico">???</span> Security
           </button>
           <button class="settings-nav-item" data-tab="privacy">
-            <span class="ico">✋</span> Privacy
+            <span class="ico">?</span> Privacy
           </button>
           <button class="settings-nav-item" data-tab="notifications">
-            <span class="ico">🔔</span> Notifications
+            <span class="ico">??</span> Notifications
           </button>
         </nav>
       </div>
@@ -355,14 +355,14 @@
               <div class="settings-label">Emoji Clan</div>
               <div class="settings-hint">Chosen at registration. Cannot be changed.</div>
             </div>
-            <div class="settings-emoji-display" id="settingsUserEmoji">👻</div>
+            <div class="settings-emoji-display" id="settingsUserEmoji">??</div>
           </div>
 
-          <!-- Core Flow Avatar Upload -->
+          <!-- Profile Picture Upload -->
           <div class="settings-group" id="avatarUploadGroup">
             <div class="settings-field-header">
               <div>
-                <div class="settings-label">Profile Picture <span class="coreflow-badge-inline">⬡ Core Flow</span></div>
+                <div class="settings-label">Profile Picture</div>
                 <div class="settings-hint">Upload a custom profile picture</div>
               </div>
             </div>
@@ -375,10 +375,7 @@
               </div>
               <p class="settings-hint" style="margin-top:8px;">JPG, PNG · Max 3MB</p>
             </div>
-            <div id="avatarLockedMsg" class="coreflow-locked-msg hidden">
-              <span>🔒</span> Custom avatars are a <strong>Core Flow</strong> exclusive feature.
-            </div>
-          </div>
+            <div id="avatarLockedMsg" class="coreflow-locked-msg hidden"></div>
 
           <div class="settings-group">
             <div class="settings-label">Display Name</div>
@@ -408,7 +405,7 @@
           <div class="settings-group" id="bannerUploadGroup">
             <div class="settings-field-header">
               <div>
-                <div class="settings-label">Profile Banner <span class="coreflow-badge-inline">⬡ Core Flow</span></div>
+                <div class="settings-label">Profile Banner</div>
                 <div class="settings-hint">Upload a custom profile banner</div>
               </div>
             </div>
@@ -423,10 +420,7 @@
               </div>
               <p class="settings-hint" style="margin-top:8px;">Recommended size: 1500x500 · JPG, PNG · Max 5MB</p>
             </div>
-            <div id="bannerLockedMsg" class="coreflow-locked-msg hidden">
-              <span>🔒</span> Custom banners are a <strong>Core Flow</strong> exclusive feature.
-            </div>
-          </div>
+            <div id="bannerLockedMsg" class="coreflow-locked-msg hidden"></div>
           <div class="settings-placeholder" style="margin-top: 24px;">More design settings coming soon...</div>
         </div>
         <div id="tab-security" class="settings-tab-content hidden">
@@ -512,7 +506,7 @@
       <div id="mobUnreadBadge" aria-hidden="true" style="position: absolute; top: 50%; right: 26%; width: 10px; height: 10px; background: #ff2b52; border-radius: 50%; display: none; border: 2px solid var(--bg); z-index: 5; box-shadow: 0 0 0 2px rgba(255, 43, 82, 0.18); transform: translateY(-50%);"></div>
     </a>
     <a href="#" class="mobile-nav-item" id="mobNavProfile">
-      <span class="ico">👤</span>
+      <span class="ico">??</span>
       <span>Profile</span>
     </a>
   </nav>

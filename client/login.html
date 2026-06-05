@@ -75,16 +75,8 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    const meRes = await fetch('/auth/me', { credentials: 'include' });
-                    if (!meRes.ok) {
-                        showFeedback('Login worked, but the session did not stick. Try again.', 'error');
-                        inputs.forEach(i => i.classList.add('error-state'));
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = 'Login';
-                        return;
-                    }
                     showFeedback('Welcome back.');
-                    setTimeout(() => window.location.href = '/', 500);
+                    setTimeout(() => window.location.href = '/', 1000);
                 } else {
                     if (data.error === 'suspended') {
                         showFeedback('Account is suspended. Redirecting...', 'error');

@@ -80,7 +80,10 @@ router.post("/signup", async (req, res, next) => {
     // Auto-login after signup
     req.session.userId = newUser.id;
     req.session.userEmoji = emoji;
-    res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji, is_synced: true, is_verified: true } });
+    req.session.save((saveErr) => {
+      if (saveErr) return next(saveErr);
+      res.status(201).json({ message: "User created successfully", user: { id: newUser.id, username, emoji, is_synced: true, is_verified: true } });
+    });
   } catch (err) {
     if (err.code === '23505') { // Postgres code for UNIQUE violation
       return res.status(400).json({ error: "Username already taken" });
@@ -129,22 +132,25 @@ router.post("/login", async (req, res, next) => {
 
     req.session.userId = user.id;
     req.session.userEmoji = user.emoji;
-    res.json({ 
-      message: "Logged in successfully", 
-      user: { 
-        id: user.id, 
-        username: user.username, 
-        emoji: user.emoji, 
-        bio: user.bio, 
-        is_premium: user.is_premium || 0, 
-        avatar_path: user.avatar_path || null,
-        isSynced: !!user.is_synced,
-        is_verified: !!user.is_verified,
-        email: user.email || null,
-        role: user.role,
-        warnings: user.warnings || 0,
-        warning_reasons: user.warning_reasons || []
-      } 
+    req.session.save((saveErr) => {
+      if (saveErr) return next(saveErr);
+      res.json({ 
+        message: "Logged in successfully", 
+        user: { 
+          id: user.id, 
+          username: user.username, 
+          emoji: user.emoji, 
+          bio: user.bio, 
+          is_premium: user.is_premium || 0, 
+          avatar_path: user.avatar_path || null,
+          isSynced: !!user.is_synced,
+          is_verified: !!user.is_verified,
+          email: user.email || null,
+          role: user.role,
+          warnings: user.warnings || 0,
+          warning_reasons: user.warning_reasons || []
+        } 
+      });
     });
   } catch (err) {
     next(err);

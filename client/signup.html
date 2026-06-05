@@ -107,8 +107,18 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
+                    const meRes = await fetch('/auth/me', { credentials: 'include' });
+                    if (!meRes.ok) {
+                        showFeedback('Account created, but the session did not stick. Try again.', 'error');
+                        inputs.forEach(i => i.classList.add('error-state'));
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Begin Journey';
+                        }
+                        return;
+                    }
                     showFeedback('Welcome to the Core.');
-                    setTimeout(() => window.location.href = '/', 1500);
+                    setTimeout(() => window.location.href = '/', 500);
                 } else {
                     showFeedback(data.error || 'Signup failed', 'error');
                     // Specifically highlight the username if it's taken or invalid

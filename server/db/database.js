@@ -1,11 +1,16 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
+// Determine if SSL should be enabled
+// Supabase requires SSL, local PostgreSQL typically does not
+const enableSSL = process.env.DATABASE_SSL === 'true';
+
 // Create a connection pool to PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // If using a cloud provider like Supabase/Neon, you might need SSL
-  // ssl: { rejectUnauthorized: false }
+  // Enable SSL for cloud providers (Supabase, Neon, etc.)
+  // rejectUnauthorized: false allows self-signed certificates
+  ssl: enableSSL ? { rejectUnauthorized: false } : false
 });
 
 pool.on("connect", () => {

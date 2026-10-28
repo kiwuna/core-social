@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Core / Protocols</title>
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #050505;
+            color: #e5e5e5;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* unified liquid background engine */
+        body::before,
+        body::after {
+            content: '';
+            position: absolute;
+            width: clamp(320px, 45vw, 550px);
+            height: clamp(320px, 45vw, 550px);
+            filter: blur(130px);
+            z-index: 0;
+            opacity: 0.18;
+        }
+
+        body::before {
+            background: radial-gradient(circle, #ffffff 0%, transparent 75%);
+            top: -10%;
+            left: -10%;
+            animation: fluidBlobMoveOne 22s infinite ease-in-out;
+        }
+
+        body::after {
+            background: radial-gradient(circle, #444444 0%, transparent 70%);
+            bottom: -10%;
+            right: -10%;
+            animation: fluidBlobMoveTwo 26s infinite ease-in-out;
+        }
+
+        @keyframes fluidBlobMoveOne {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                border-radius: 50%;
+            }
+            33% {
+                transform: translate(120px, 60px) scale(1.3) rotate(120deg);
+                border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+            }
+            66% {
+                transform: translate(-60px, 140px) scale(0.85) rotate(240deg);
+                border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%;
+            }
+            100% {
+                transform: translate(0, 0) scale(1) rotate(360deg);
+                border-radius: 50%;
+            }
+        }
+
+        @keyframes fluidBlobMoveTwo {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                border-radius: 50%;
+            }
+            33% {
+                transform: translate(-100px, -80px) scale(1.25) rotate(-120deg);
+                border-radius: 55% 45% 30% 70% / 50% 60% 40% 50%;
+            }
+            66% {
+                transform: translate(80px, -120px) scale(0.9) rotate(-240deg);
+                border-radius: 40% 60% 60% 40% / 40% 40% 60% 60%;
+            }
+            100% {
+                transform: translate(0, 0) scale(1) rotate(-360deg);
+                border-radius: 50%;
+            }
+        }
+
+        /* glass doc frame */
+        .doc-container {
+            background: rgba(12, 12, 12, 0.4);
+            backdrop-filter: blur(35px);
+            -webkit-backdrop-filter: blur(35px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 40px 120px rgba(0, 0, 0, 0.95), 
+                        inset 0 1px 0px rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            max-width: 680px;
+            width: 100%;
+            padding: 50px 45px;
+            z-index: 1;
+            position: relative;
+        }
+
+        header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 24px;
+        }
+
+        header .logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(180deg, #ffffff 0%, #a3a3a3 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .update-date {
+            font-size: 12px;
+            color: #737373;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .intro-text {
+            color: #a3a3a3;
+            font-size: 15px;
+            margin-bottom: 35px;
+        }
+
+        /* structural content sections */
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            margin: 35px 0 16px 0;
+            letter-spacing: -0.2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::before {
+            content: '•';
+            color: #737373;
+        }
+
+        .doc-block {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .doc-block h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .doc-block p, .doc-block ul {
+            font-size: 14px;
+            color: #a3a3a3;
+            margin-bottom: 12px;
+        }
+
+        .doc-block p:last-child, .doc-block ul:last-child {
+            margin-bottom: 0;
+        }
+
+        .doc-block ul {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        .doc-block li {
+            margin-bottom: 8px;
+            position: relative;
+            padding-left: 16px;
+        }
+
+        .doc-block li::before {
+            content: '—';
+            position: absolute;
+            left: 0;
+            color: #525252;
+        }
+
+        .doc-block li:last-child {
+            margin-bottom: 0;
+        }
+
+        .highlight-text {
+            color: #fff;
+            font-weight: 500;
+        }
+
+        /* premium action footer */
+        .doc-footer {
+            margin-top: 45px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .doc-footer p {
+            font-size: 13px;
+            color: #737373;
+        }
+
+        .action-link {
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: opacity 0.2s ease;
+        }
+
+        .action-link:hover {
+            opacity: 0.8;
+        }
+
+        @media (max-width: 520px) {
+            .doc-container { padding: 35px 25px; }
+            .doc-footer { flex-direction: column; gap: 16px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="doc-container">
+        <header>
+            <div class="logo">Core</div>
+            <h1>Platform Protocols</h1>
+            <div class="update-date">Effective June 2026</div>
+        </header>
+
+        <p class="intro-text">
+            Welcome to Core. By creating an account or interacting with our platform, you accept these operational terms. If you do not align with these terms, do not initialize an account or use the ecosystem.
+        </p>
+
+        <h2 class="section-title">Terms of Service</h2>
+
+        <div class="doc-block">
+            <h3>1. Account & Security</h3>
+            <p>You hold absolute responsibility for maintaining the confidentiality of your credentials. <span class="highlight-text">If you lose your handle or secret password, we cannot recover your account.</span></p>
+            <p>We preserve the explicit right to terminate or wipe any session or database record that violates system rules or displays network abuse.</p>
+        </div>
+
+        <div class="doc-block">
+            <h3>2. User-Generated Content</h3>
+            <p>You retain original ownership of data you transmit, but you grant Core a global license to host, parse, cache, and display your assets safely.</p>
+            <p>Uploading toxic/illegal material, hate data, malicious code injections, or non-authorized copyrighted data is explicitly blocked.</p>
+            <p>Media storage routines route through external nodes (<span class="highlight-text">Cloudinary</span>). Any assets flag-violating their global delivery policies will be wiped automatically from cache layers.</p>
+        </div>
+
+        <div class="doc-block">
+            <h3>3. Limitation of Liability</h3>
+            <p>Core operates strictly on an <span class="highlight-text">"as is"</span> build framework with zero underlying warranty guarantees. We assume no legal liability for standard user interactions, temporary server down-phases, database latency, or unexpected downtime data loss.</p>
+        </div>
+
+        <div class="doc-block">
+            <h3>4. Direct Messages</h3>
+            <ul>
+                <li>Direct messaging instances are end-isolated between you and the recipient node.</li>
+                <li>Chat logs persist inside database schemas strictly to mirror active cross-session chat syncing. Data is not scanned, monitored, or analyzed unless severe system protocol abuse flags are raised.</li>
+            </ul>
+        </div>
+
+        <h2 class="section-title">Privacy Policy</h2>
+
+        <div class="doc-block">
+            <h3>1. Data We Collect</h3>
+            <p><span class="highlight-text">Account Info:</span> We write your distinct public user handle and a securely cryptographically hashed format of your secret password string into database structures.</p>
+            <p><span class="highlight-text">Media Assets:</span> Profile layout images and timeline attachments route directly to Cloudinary pipelines.</p>
+            <p><span class="highlight-text">Session Data:</span> Core implements highly minimal encrypted technical tokens or tracking cookies explicitly to process your authentication loop.</p>
+        </div>
+
+        <div class="doc-block">
+            <h3>2. How We Use It</h3>
+            <p>Data maps solely to render account configurations, construct your network feed array, and evaluate safe secure logins. Core does not track user pathways across third-party web domains or commercialize user details to data brokers.</p>
+        </div>
+
+        <footer class="doc-footer">
+            <p>© 2026 Core. All rights reserved.</p>
+            <a href="javascript:window.close();" class="action-link">Return</a>
+        </footer>
+    </div>
+
+</body>
+</html>

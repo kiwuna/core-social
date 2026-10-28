@@ -52,7 +52,7 @@ router.get("/", isAuthenticated, async (req, res, next) => {
       FROM notifications n
       JOIN users u ON n.sender_id = u.id
       LEFT JOIN posts p ON n.post_id = p.id
-      WHERE n.recipient_id = $1
+      WHERE n.recipient_id = $1 AND n.type != 'report'
       ORDER BY n.created_at DESC
       LIMIT 50
     `;

@@ -1,0 +1,361 @@
+-- Core Social Database Schema
+-- Migration 001: Initial schema creation
+-- This migration is idempotent - safe to run multiple times
+-- Compatible with PostgreSQL and Supabase
+
+-- Enable UUID extension if needed (not currently used but available)
+-- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  emoji TEXT NOT NULL,
+  bio TEXT DEFAULT '',
+  is_premium INTEGER NOT NULL DEFAULT 0,
+  avatar_path TEXT,
+  display_name TEXT,
+  banner_path TEXT,
+  email TEXT,
+  is_synced BOOLEAN DEFAULT FALSE,
+  is_verified BOOLEAN DEFAULT FALSE,
+  sync_code TEXT,
+  last_sync_request BIGINT,
+  warnings INTEGER DEFAULT 0,
+  warning_reasons TEXT[] DEFAULT '{}'::TEXT[],
+  is_banned BOOLEAN DEFAULT FALSE,
+  role TEXT DEFAULT 'user',
+  acknowledged_warnings INTEGER DEFAULT 0,
+  suspended_until TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add missing columns if they don't exist (idempotent)
+DO $$
+BEGIN
+  -- Email column
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'email'
+  ) THEN
+    ALTER TABLE users ADD COLUMN email TEXT;
+  END IF;
+
+  -- Drop email unique constraint if exists
+  ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
+
+  -- Sync-related columns
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'is_synced'
+  ) THEN
+    ALTER TABLE users ADD COLUMN is_synced BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'is_verified'
+  ) THEN
+    ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'sync_code'
+  ) THEN
+    ALTER TABLE users ADD COLUMN sync_code TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'last_sync_request'
+  ) THEN
+    ALTER TABLE users ADD COLUMN last_sync_request BIGINT;
+  END IF;
+
+  -- Warnings and moderation columns
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'warnings'
+  ) THEN
+    ALTER TABLE users ADD COLUMN warnings INTEGER DEFAULT 0;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'warning_reasons'
+  ) THEN
+    ALTER TABLE users ADD COLUMN warning_reasons TEXT[] DEFAULT '{}'::TEXT[];
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'is_banned'
+  ) THEN
+    ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'role'
+  ) THEN
+    ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'acknowledged_warnings'
+  ) THEN
+    ALTER TABLE users ADD COLUMN acknowledged_warnings INTEGER DEFAULT 0;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'users' AND column_name = 'suspended_until'
+  ) THEN
+    ALTER TABLE users ADD COLUMN suspended_until TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+  END IF;
+END $$;
+
+-- Posts table
+CREATE TABLE IF NOT EXISTS posts (
+  id SERIAL PRIMARY KEY,
+  content TEXT NOT NULL,
+  likes INTEGER NOT NULL DEFAULT 0,
+  image_path TEXT,
+  video_path TEXT,
+  media_type TEXT DEFAULT 'text',
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  font_style TEXT DEFAULT 'default',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add missing columns to posts
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'posts' AND column_name = 'video_path'
+  ) THEN
+    ALTER TABLE posts ADD COLUMN video_path TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'posts' AND column_name = 'media_type'
+  ) THEN
+    ALTER TABLE posts ADD COLUMN media_type TEXT DEFAULT 'text';
+  END IF;
+END $$;
+
+-- Likes table
+CREATE TABLE IF NOT EXISTS likes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, post_id)
+);
+
+-- Reposts table
+CREATE TABLE IF NOT EXISTS reposts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, post_id)
+);
+
+-- Indexes for reposts
+CREATE INDEX IF NOT EXISTS idx_reposts_user_id ON reposts(user_id);
+CREATE INDEX IF NOT EXISTS idx_reposts_post_id ON reposts(post_id);
+
+-- Comments table
+CREATE TABLE IF NOT EXISTS comments (
+  id SERIAL PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Polls table
+CREATE TABLE IF NOT EXISTS polls (
+  id SERIAL PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Poll Options table
+CREATE TABLE IF NOT EXISTS poll_options (
+  id SERIAL PRIMARY KEY,
+  poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+  option_text TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Poll Votes table
+CREATE TABLE IF NOT EXISTS poll_votes (
+  id SERIAL PRIMARY KEY,
+  poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+  option_id INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(poll_id, user_id)
+);
+
+-- Follows table
+CREATE TABLE IF NOT EXISTS follows (
+  id SERIAL PRIMARY KEY,
+  follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(follower_id, following_id),
+  CHECK (follower_id != following_id)
+);
+
+-- Verification codes table
+CREATE TABLE IF NOT EXISTS verification_codes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Messages table
+CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
+  sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+  seen_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add missing columns to messages
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'messages' AND column_name = 'delivered_at'
+  ) THEN
+    ALTER TABLE messages ADD COLUMN delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'messages' AND column_name = 'seen_at'
+  ) THEN
+    ALTER TABLE messages ADD COLUMN seen_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
+  END IF;
+END $$;
+
+-- Push subscriptions table
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for push subscriptions
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id ON push_subscriptions(user_id);
+
+-- Notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Post analytics tables
+CREATE TABLE IF NOT EXISTS post_impressions (
+  id BIGSERIAL PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  visitor_key TEXT NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  session_id TEXT,
+  first_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  visible_ms BIGINT NOT NULL DEFAULT 0,
+  is_viewed BOOLEAN NOT NULL DEFAULT FALSE,
+  device_hint TEXT,
+  ip_hash TEXT,
+  user_agent_hash TEXT,
+  UNIQUE(post_id, visitor_key)
+);
+
+CREATE TABLE IF NOT EXISTS post_view_events (
+  id BIGSERIAL PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  visitor_key TEXT NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  visible_ms INTEGER NOT NULL DEFAULT 0,
+  watch_ms INTEGER NOT NULL DEFAULT 0,
+  viewport_ratio REAL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS post_view_aggregates (
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  impressions BIGINT NOT NULL DEFAULT 0,
+  unique_views BIGINT NOT NULL DEFAULT 0,
+  views BIGINT NOT NULL DEFAULT 0,
+  watch_ms BIGINT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (post_id, day)
+);
+
+-- Indexes for post analytics
+CREATE INDEX IF NOT EXISTS idx_post_impressions_post_id ON post_impressions(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_impressions_visitor_key ON post_impressions(visitor_key);
+CREATE INDEX IF NOT EXISTS idx_post_view_events_post_id_created_at ON post_view_events(post_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_post_view_aggregates_day ON post_view_aggregates(day);
+
+-- Reports table
+CREATE TABLE IF NOT EXISTS reports (
+  id SERIAL PRIMARY KEY,
+  post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+  reporter_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(post_id, reporter_id)
+);
+
+-- Session table (for connect-pg-simple)
+CREATE TABLE IF NOT EXISTS "session" (
+  "sid" varchar NOT NULL COLLATE "default",
+  "sess" json NOT NULL,
+  "expire" timestamp(6) NOT NULL
+) WITH (OIDS=FALSE);
+
+-- Add primary key and index for session table
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'session_pkey'
+  ) THEN
+    ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE indexname = 'IDX_session_expire'
+  ) THEN
+    CREATE INDEX "IDX_session_expire" ON "session" ("expire");
+  END IF;
+END $$;

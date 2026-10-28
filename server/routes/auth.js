@@ -351,4 +351,47 @@ router.post("/activate-premium", isAuthenticated, async (req, res, next) => {
   }
 });
 
+// POST /warnings (Send warning to user)
+router.post("/warnings", isAuthenticated, async (req, res, next) => {
+  const db = req.app.locals.db;
+  const userId = req.session.userId;
+  const { post_id, reason } = req.body;
+
+  // Check if user is admin/mod
+  const userRes = await db.query("SELECT role FROM users WHERE id = $1", [userId]);
+  const user = userRes.rows[0];
+  
+  if (!user || !['admin', 'ceo', 'mod'].includes(user.role)) {
+    return res.status(403).json({ error: "Access denied." });
+  }
+
+  try {
+    // Get the post to find the author
+    const postRes = await db.query("SELECT user_id FROM posts WHERE id = $1", [post_id]);
+    const post = postRes.rows[0];
+    
+    if (!post) {
+      return res.status(404).json({ error: "Post not found." });
+    }
+
+    const authorId = post.user_id;
+
+    // Increment warnings
+    await db.query(
+      "UPDATE users SET warnings = warnings + 1, warning_reasons = array_append(warning_reasons, $1) WHERE id = $2",
+      [reason, authorId]
+    );
+
+    // Create notification for the warned user
+    await db.query(
+      "INSERT INTO notifications (type, sender_id, recipient_id, post_id, created_at) VALUES ($1, $2, $3, $4, NOW())",
+      ["warning", userId, authorId, post_id]
+    );
+
+    res.json({ success: true, message: "Warning sent." });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

@@ -6,56 +6,398 @@
     <title>Core</title>
     <link rel="icon" type="image/png" href="./favicon.png" />
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body.auth-page {
+            background: #050505;
+            position: relative;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* crazy liquid background morphing engine */
+        body.auth-page::before,
+        body.auth-page::after {
+            content: '';
+            position: absolute;
+            width: clamp(320px, 45vw, 550px);
+            height: clamp(320px, 45vw, 550px);
+            filter: blur(130px);
+            z-index: 0;
+            opacity: 0.22;
+            pointer-events: none; /* fix: stops blobs from blocking input clicks */
+        }
+
+        body.auth-page::before {
+            background: radial-gradient(circle, var(--accent, #fff) 0%, transparent 75%);
+            top: -10%;
+            left: -10%;
+            animation: fluidBlobMoveOne 22s infinite ease-in-out;
+        }
+
+        body.auth-page::after {
+            background: radial-gradient(circle, #444444 0%, transparent 70%);
+            bottom: -10%;
+            right: -10%;
+            animation: fluidBlobMoveTwo 26s infinite ease-in-out;
+        }
+
+        @keyframes fluidBlobMoveOne {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                border-radius: 50%;
+            }
+            33% {
+                transform: translate(120px, 60px) scale(1.3) rotate(120deg);
+                border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+            }
+            66% {
+                transform: translate(-60px, 140px) scale(0.85) rotate(240deg);
+                border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%;
+            }
+            100% {
+                transform: translate(0, 0) scale(1) rotate(360deg);
+                border-radius: 50%;
+            }
+        }
+
+        @keyframes fluidBlobMoveTwo {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                border-radius: 50%;
+            }
+            33% {
+                transform: translate(-100px, -80px) scale(1.25) rotate(-120deg);
+                border-radius: 55% 45% 30% 70% / 50% 60% 40% 50%;
+            }
+            66% {
+                transform: translate(80px, -120px) scale(0.9) rotate(-240deg);
+                border-radius: 40% 60% 60% 40% / 40% 40% 60% 60%;
+            }
+            100% {
+                transform: translate(0, 0) scale(1) rotate(-360deg);
+                border-radius: 50%;
+            }
+        }
+
+        .auth-container {
+            background: rgba(12, 12, 12, 0.4) !important;
+            backdrop-filter: blur(35px) !important;
+            -webkit-backdrop-filter: blur(35px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+            box-shadow: 0 40px 120px rgba(0, 0, 0, 0.95), 
+                        inset 0 1px 0px rgba(255, 255, 255, 0.08) !important;
+            border-radius: var(--radius-xl, 24px) !important;
+            width: 440px;
+            min-height: 560px; /* fix: swapped from static height to min-height */
+            padding: 45px 40px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 2;
+        }
+
+        header .logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            background: linear-gradient(180deg, #ffffff 0%, #a3a3a3 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+
+        header .subtitle {
+            font-size: 14px;
+            color: var(--muted, #737373);
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .auth-form {
+            position: relative;
+            width: 100%;
+            flex-grow: 1; /* dynamic allocation */
+        }
+
+        .form-step {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .step-one {
+            opacity: 1;
+            transform: translateX(0);
+            z-index: 3;
+        }
+
+        .step-two {
+            opacity: 0;
+            transform: translateX(40px);
+            z-index: 1;
+            display: none;
+        }
+
+        .auth-form .form-group label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted, #737373);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .auth-form input[type="text"],
+        .auth-form input[type="password"] {
+            background: rgba(255, 255, 255, 0.01) !important;
+            border: 1px solid rgba(255, 255, 255, 0.04) !important;
+            border-radius: var(--radius-md, 12px) !important;
+            padding: 15px 18px !important;
+            font-size: 15px !important;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            width: 100%;
+            color: #fff;
+            outline: none;
+        }
+
+        .auth-form input::placeholder { color: rgba(255, 255, 255, 0.15); }
+        .auth-form input:focus {
+            background: rgba(255, 255, 255, 0.03) !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .auth-form input.error-state {
+            border-color: rgba(239, 68, 68, 0.35) !important;
+            background: rgba(239, 68, 68, 0.02) !important;
+        }
+
+        .emoji-picker {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 10px !important;
+        }
+
+        .emoji-option {
+            background: rgba(255, 255, 255, 0.02) !important;
+            border: 1px solid rgba(255, 255, 255, 0.04) !important;
+            border-radius: var(--radius-md, 12px) !important;
+            padding: 12px !important;
+            font-size: 22px !important;
+            transition: all 0.25s ease !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+        }
+
+        .emoji-option:hover {
+            background: rgba(255, 255, 255, 0.06) !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+            transform: translateY(-1.5px) !important;
+        }
+
+        .emoji-option.selected {
+            background: var(--accent, #fff) !important;
+            color: var(--bg, #050505) !important;
+            border-color: var(--accent, #fff) !important;
+            box-shadow: 0 8px 20px rgba(255, 255, 255, 0.1) !important;
+        }
+
+        .terms-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 4px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .terms-group input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            position: relative;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+        }
+
+        .terms-group input[type="checkbox"]:checked {
+            background: var(--accent, #fff);
+            border-color: var(--accent, #fff);
+        }
+
+        .terms-group input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: var(--bg, #050505);
+            font-size: 12px;
+            font-weight: 900;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .terms-text {
+            font-size: 13px;
+            color: var(--muted, #737373);
+            line-height: 1.4;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .terms-text a { 
+            color: #fff; 
+            text-decoration: none; 
+            font-weight: 600;
+            position: relative;
+            z-index: 11;
+        }
+        .terms-text a:hover { text-decoration: underline; }
+
+        .primary-btn {
+            background: var(--accent, #fff) !important;
+            color: var(--bg, #050505) !important;
+            border-radius: var(--radius-md, 12px) !important;
+            padding: 16px !important;
+            font-size: 15px !important;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            width: 100%;
+            margin-top: 8px;
+            position: relative;
+            z-index: 5;
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-1.5px) !important;
+            box-shadow: 0 15px 35px rgba(255, 255, 255, 0.12) !important;
+            background: #f0f0f0 !important;
+        }
+
+        .auth-footer {
+            margin-top: 32px; /* clean breathing room at the bottom */
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            color: var(--muted, #737373);
+            position: relative;
+            z-index: 5;
+        }
+
+        .auth-footer a { color: #fff; font-weight: 700; text-decoration: none; }
+        .auth-footer a:hover { text-decoration: underline; }
+
+        #feedback-container {
+            margin-top: 16px;
+            width: 100%;
+            position: relative;
+            z-index: 5;
+        }
+
+        .feedback-message {
+            font-family: inherit;
+            border-radius: 100px;
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body class="auth-page">
-    <div class="auth-container">
+    <div class="auth-container" id="auth-container">
         <header>
             <h1 class="logo">Core</h1>
-            <p class="subtitle">Choose your identity.</p>
+            <p class="subtitle" id="auth-subtitle">Create your identity.</p>
         </header>
 
         <form id="signup-form" class="auth-form">
-            <div class="form-group">
-                <label>Emoji Identity</label>
-                <div class="emoji-picker">
-                    <button type="button" class="emoji-option selected" data-emoji="🍄">🍄</button>
-                    <button type="button" class="emoji-option" data-emoji="🪐">🪐</button>
-                    <button type="button" class="emoji-option" data-emoji="🧿">🧿</button>
-                    <button type="button" class="emoji-option" data-emoji="💎">💎</button>
-                    <button type="button" class="emoji-option" data-emoji="🦋">🦋</button>
-                    <button type="button" class="emoji-option" data-emoji="⚡">⚡</button>
-                    <button type="button" class="emoji-option" data-emoji="🔮">🔮</button>
-                    <button type="button" class="emoji-option" data-emoji="🖤">🖤</button>
+            <div class="form-step step-one" id="step-one-panel">
+                <div class="form-group">
+                    <label for="username">Handle</label>
+                    <input type="text" id="username" placeholder="Unique username..." required autofocus>
                 </div>
-                <input type="hidden" id="selected-emoji" value="🍄">
+                
+                <div class="form-group">
+                    <label for="password">Secret</label>
+                    <input type="password" id="password" placeholder="Min 6 characters..." required>
+                </div>
+
+                <div class="terms-group">
+                    <input type="checkbox" id="terms" required>
+                    <label for="terms" class="terms-text">
+                        I accept the <a href="terms.html" target="_blank" onclick="event.stopPropagation();">Terms and Conditions</a> and privacy protocols.
+                    </label>
+                </div>
+
+                <button type="button" class="primary-btn" id="next-step-btn">Begin Journey</button>
+
+                <footer class="auth-footer">
+                    <p>Known here? <a href="login.html">Login</a></p>
+                </footer>
             </div>
 
-            <div class="form-group">
-                <label for="username">Handle</label>
-                <input type="text" id="username" placeholder="Unique username..." required>
+            <div class="form-step step-two" id="step-two-panel">
+                <div class="form-group">
+                    <label>Select Emoji Identity</label>
+                    <div class="emoji-picker">
+                        <button type="button" class="emoji-option selected" data-emoji="🍄">🍄</button>
+                        <button type="button" class="emoji-option" data-emoji="🪐">🪐</button>
+                        <button type="button" class="emoji-option" data-emoji="🧿">🧿</button>
+                        <button type="button" class="emoji-option" data-emoji="💎">💎</button>
+                        <button type="button" class="emoji-option" data-emoji="🦋">🦋</button>
+                        <button type="button" class="emoji-option" data-emoji="⚡">⚡</button>
+                        <button type="button" class="emoji-option" data-emoji="🔮">🔮</button>
+                        <button type="button" class="emoji-option" data-emoji="🖤">🖤</button>
+                    </div>
+                    <input type="hidden" id="selected-emoji" value="🍄">
+                </div>
+
+                <button type="submit" class="primary-btn" id="submit-btn">Finalize Profile</button>
+
+                <footer class="auth-footer">
+                    <p>Known here? <a href="login.html">Login</a></p>
+                </footer>
             </div>
             
-            <div class="form-group">
-                <label for="password">Secret</label>
-                <input type="password" id="password" placeholder="Min 6 characters..." required>
-            </div>
-
-            <button type="submit" class="primary-btn">Begin Journey</button>
             <div id="feedback-container"></div>
         </form>
-
-        <footer class="auth-footer">
-            <p>Known here? <a href="login.html">Login</a></p>
-        </footer>
     </div>
 
-
-
     <script>
+        const container = document.getElementById('auth-container');
+        const subtitle = document.getElementById('auth-subtitle');
+        const nextBtn = document.getElementById('next-step-btn');
         const emojiOptions = document.querySelectorAll('.emoji-option');
         const emojiInput = document.getElementById('selected-emoji');
         const feedbackContainer = document.getElementById('feedback-container');
+        const stepOne = document.getElementById('step-one-panel');
+        const stepTwo = document.getElementById('step-two-panel');
 
         emojiOptions.forEach(opt => {
             opt.addEventListener('click', () => {
@@ -77,12 +419,43 @@
             }, 3000);
         }
 
+        nextBtn.addEventListener('click', () => {
+            const userField = document.getElementById('username');
+            const passField = document.getElementById('password');
+            const termsCheck = document.getElementById('terms');
+
+            userField.classList.remove('error-state');
+            passField.classList.remove('error-state');
+
+            if (!userField.value || passField.value.length < 6) {
+                if(!userField.value) userField.classList.add('error-state');
+                if(passField.value.length < 6) passField.classList.add('error-state');
+                showFeedback('Fill details completely (Secret min 6 chars).', 'error');
+                return;
+            }
+
+            if (!termsCheck.checked) {
+                showFeedback('You must accept the terms.', 'error');
+                return;
+            }
+
+            stepOne.style.opacity = '0';
+            stepOne.style.transform = 'translateX(-40px)';
+            
+            setTimeout(() => {
+                stepOne.style.display = 'none';
+                stepTwo.style.display = 'flex';
+                setTimeout(() => {
+                    stepTwo.style.opacity = '1';
+                    stepTwo.style.transform = 'translateX(0)';
+                }, 50);
+            }, 400);
+
+            subtitle.textContent = 'Claim your icon.';
+        });
+
         document.getElementById('signup-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const form = e.target;
-            const inputs = form.querySelectorAll('input');
-            inputs.forEach(i => i.classList.remove('error-state'));
-
             if (window.location.protocol === 'file:') {
                 showFeedback('Error: Please open through a web server (http/https)!', 'error');
                 return;
@@ -91,11 +464,11 @@
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const emoji = emojiInput.value;
+            const submitBtn = document.getElementById('submit-btn');
 
-            const submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.textContent = '...';
+                submitBtn.textContent = 'Claiming...';
             }
 
             try {
@@ -111,22 +484,30 @@
                     setTimeout(() => window.location.href = '/', 1500);
                 } else {
                     showFeedback(data.error || 'Signup failed', 'error');
-                    // Specifically highlight the username if it's taken or invalid
                     if (data.error && data.error.toLowerCase().includes('username')) {
+                        stepTwo.style.opacity = '0';
+                        stepTwo.style.transform = 'translateX(40px)';
+                        setTimeout(() => {
+                            stepTwo.style.display = 'none';
+                            stepOne.style.display = 'flex';
+                            setTimeout(() => {
+                                stepOne.style.opacity = '1';
+                                stepOne.style.transform = 'translateX(0)';
+                            }, 50);
+                        }, 400);
+                        subtitle.textContent = 'Choose your identity.';
                         document.getElementById('username').classList.add('error-state');
-                    } else {
-                        inputs.forEach(i => i.classList.add('error-state'));
                     }
                     if (submitBtn) {
                         submitBtn.disabled = false;
-                        submitBtn.textContent = 'Begin Journey';
+                        submitBtn.textContent = 'Finalize Profile';
                     }
                 }
             } catch (err) {
                 showFeedback('Connection error: Is server running?', 'error');
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = 'Begin Journey';
+                    submitBtn.textContent = 'Finalize Profile';
                 }
             }
         });

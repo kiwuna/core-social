@@ -1606,11 +1606,27 @@ async function showReportsFolder() {
           ${r.post_content ? `<p class="notification-item-preview">${r.post_content}</p>` : ""}
           <span class="notification-item-time">${timeAgo(new Date(r.created_at))}</span>
         </div>
-        <div class="notification-item-icon">🚩</div>
+        <div class="notification-item-actions">
+          <button class="btn-report-action" data-report-id="${r.id}" data-post-id="${r.post_id}">
+            ⚠️ Warning
+          </button>
+          <button class="btn-report-action" data-report-id="${r.id}" data-post-id="${r.post_id}" data-action="delete">
+            ❌ Delete + Warning
+          </button>
+        </div>
       `;
       
+      // Handle action button clicks
+      el.querySelectorAll(".btn-report-action").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const action = btn.dataset.action || "warning";
+          handleReportAction(r.id, r.post_id, action);
+        });
+      });
+      
       el.onclick = (e) => {
-        if (e.target.classList.contains('notification-swipe-action')) return;
+        if (e.target.classList.contains('notification-swipe-action') || e.target.classList.contains('btn-report-action')) return;
         if (r.post_id) {
           MapsTo('post/' + r.post_id);
         }
@@ -2938,6 +2954,56 @@ if (activateCoreFlowModal) {
       activateCoreFlowModal.textContent = 'Activate Core Flow';
     }
   });
+}
+
+async function handleReportAction(reportId, postId, action) {
+  if (!currentUser) { window.location.href = "login.html"; return; }
+  if (!postId) {
+    showFeedback("Post not found.", "error");
+    return;
+  }
+  
+  if (action === "delete") {
+    if (!confirm("Delete this post and send a warning to the author?")) return;
+  } else {
+    if (!confirm("Send a warning to the post author?")) return;
+  }
+  
+  try {
+    // Perform the action
+    if (action === "delete") {
+      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE" });
+      if (!res.ok) {
+        showFeedback("Failed to delete post.", "error");
+        return;
+      }
+    }
+    
+    // Send warning notification
+    await fetch(`${API_URL}/warnings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        post_id: postId,
+        reason: action === "delete" ? "Post deleted by moderator for policy violation" : "Post flagged by user for policy violation"
+      }),
+      credentials: "include"
+    });
+    
+    showFeedback(action === "delete" ? "Post deleted and warning sent." : "Warning sent to user.", "success");
+    
+    // Remove from reports list
+    const reportItem = document.querySelector(`[data-id="${reportId}"]`);
+    if (reportItem) {
+      reportItem.style.opacity = "0";
+      setTimeout(() => reportItem.remove(), 300);
+    }
+    
+    // Refresh reports
+    setTimeout(() => showReportsFolder(), 500);
+  } catch (err) {
+    showFeedback("Error processing report.", "error");
+  }
 }
 
 // ═══════════════════════════════════════

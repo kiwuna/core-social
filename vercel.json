@@ -1,8 +1,9 @@
 {
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/client/index.html"
+      "destination": "/client/$1"
     }
   ],
   "headers": [

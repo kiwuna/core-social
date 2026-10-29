@@ -13,7 +13,7 @@ const syncRouter = require("./routes/sync");
 const adminRouter = require("./routes/admin");
 const messagesRouter = require("./routes/messages");
 const { router: pushRouter, sendMessagePush } = require("./routes/push");
-const { cloudflareIPRestriction } = require("./middleware/cloudflareIps");
+
 const errorHandler = require("./middleware/errorHandler");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -29,7 +29,6 @@ const io = new Server(server, {
 
 const PORT = Number(process.env.PORT) || 3000;
 app.locals.db = db;
-app.set("trust proxy", 1);
 
 // Map to store connected users: userId -> Set of socket IDs
 const userSockets = new Map();
@@ -171,10 +170,7 @@ app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "client")));
 
-// Cloudflare IP restriction middleware (if enabled)
-if (process.env.CLOUDFLARE_ORIGIN_RULES === 'cloudflare_ips_only') {
-  app.use(cloudflareIPRestriction);
-}
+
 // No local uploads needed, everything is on Cloudinary
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -255,9 +251,4 @@ app.use(errorHandler);
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-});
-
-// Cloudflare Security Challenge Route
-app.get("/cloudflare-challenge", (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "cloudflare-challenge.html"));
 });

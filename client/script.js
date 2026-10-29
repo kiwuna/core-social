@@ -1,4 +1,4 @@
-const API_URL = ""; 
+const API_URL = process.env.API_URL || window.location.origin; 
 const CURRENT_TIME = new Date();
 
 function timeAgo(date) {
@@ -3344,7 +3344,8 @@ let chatSeenScrollHandlerBound = false;
 
 function initSocket() {
   if (!socket && currentUser) {
-    socket = io();
+    const socketUrl = API_URL.replace(/\/$/, '');
+    socket = io(socketUrl);
     socket.on('connect', () => {
       socket.emit('register', currentUser.id);
     });

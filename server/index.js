@@ -15,137 +15,11 @@ const messagesRouter = require("./routes/messages");
 const { router: pushRouter, sendMessagePush } = require("./routes/push");
 
 const errorHandler = require("./middleware/errorHandler");
-const http = require("http");
-const { Server } = require("socket.io");
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
 
 const PORT = Number(process.env.PORT) || 3000;
 app.locals.db = db;
-
-// Map to store connected users: userId -> Set of socket IDs
-const userSockets = new Map();
-app.set("io", io);
-app.set("userSockets", userSockets);
-
-io.on("connection", (socket) => {
-  console.log("New client connected", socket.id);
-
-  socket.on("register", (userId) => {
-    // We expect the client to send their userId when they connect
-    if (!userSockets.has(userId)) {
-      userSockets.set(userId, new Set());
-    }
-    userSockets.get(userId).add(socket.id);
-    socket.userId = userId;
-  });
-
-  socket.on("typing", ({ toUserId, isTyping }) => {
-    const fromUserId = socket.userId;
-    if (!fromUserId || !toUserId) return;
-    if (userSockets.has(Number(toUserId))) {
-      for (const receiverSocketId of userSockets.get(Number(toUserId))) {
-        io.to(receiverSocketId).emit("typing", {
-          fromUserId: Number(fromUserId),
-          isTyping: !!isTyping
-        });
-      }
-    }
-  });
-
-  socket.on("message_seen", async ({ messageId, chatUserId }) => {
-    const viewerId = socket.userId;
-    if (!viewerId || !messageId || !chatUserId) return;
-    try {
-      const result = await db.query(
-        `UPDATE messages 
-         SET seen_at = COALESCE(seen_at, NOW()) 
-         WHERE id = $1 AND receiver_id = $2 
-         RETURNING id, sender_id, receiver_id, seen_at, delivered_at`,
-        [messageId, viewerId]
-      );
-      const row = result.rows[0];
-      if (row && userSockets.has(Number(row.sender_id))) {
-        for (const senderSocketId of userSockets.get(Number(row.sender_id))) {
-          io.to(senderSocketId).emit("message_state_update", {
-            messageId: row.id,
-            seen_at: row.seen_at,
-            delivered_at: row.delivered_at,
-            chatUserId: Number(chatUserId)
-          });
-        }
-      }
-    } catch (err) {
-      console.error("message_seen error:", err.message);
-    }
-  });
-
-  socket.on("send_message", async (data) => {
-    const { sender_id, receiver_id, content } = data;
-    try {
-      // Save the message to database
-      const result = await db.query(
-        "INSERT INTO messages (sender_id, receiver_id, content, delivered_at) VALUES ($1, $2, $3, CASE WHEN $4 = TRUE THEN NOW() ELSE NULL END) RETURNING *",
-        [sender_id, receiver_id, content, userSockets.has(receiver_id)]
-      );
-      const savedMessage = result.rows[0];
-
-      // Add notification for the message
-      await db.query(
-        "INSERT INTO notifications (type, recipient_id, sender_id) VALUES ($1, $2, $3)",
-        ["message", receiver_id, sender_id]
-      );
-
-      // Emit the message back to sender (echo)
-      socket.emit("receive_message", savedMessage);
-
-      // Instantly emit to receiver if they are currently online
-      if (userSockets.has(receiver_id)) {
-        for (const receiverSocketId of userSockets.get(receiver_id)) {
-          savedMessage.delivered_at = savedMessage.delivered_at || new Date();
-          io.to(receiverSocketId).emit("receive_message", savedMessage);
-          io.to(receiverSocketId).emit("new_notification", {
-            type: "message",
-            sender_id,
-            receiver_id
-          });
-        }
-      }
-
-      // Push notification fan-out for offline/mobile users
-      try {
-        await sendMessagePush(db, receiver_id, {
-          title: "New message",
-          body: content,
-          url: `/messages/${sender_id}`,
-          icon: "/assets/CoreLogo.png",
-          badge: "/assets/CoreLogo.png"
-        });
-      } catch (pushErr) {
-        console.error("Push notification error:", pushErr.message);
-      }
-    } catch (err) {
-      console.error("Error saving message", err);
-    }
-  });
-
-  socket.on("disconnect", () => {
-    if (socket.userId && userSockets.has(socket.userId)) {
-      userSockets.get(socket.userId).delete(socket.id);
-      if (userSockets.get(socket.userId).size === 0) {
-        userSockets.delete(socket.userId);
-      }
-    }
-    console.log("Client disconnected", socket.id);
-  });
-});
 
 // Session configuration
 app.use(
@@ -249,6 +123,6 @@ app.get("/health", (req, res) => {
 
 app.use(errorHandler);
 
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

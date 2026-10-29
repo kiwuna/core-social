@@ -1,0 +1,44 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/posts/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/users/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/feed/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/notifications/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/create-checkout-session",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/checkout-success",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/client/index.html"
+    }
+  ]
+}

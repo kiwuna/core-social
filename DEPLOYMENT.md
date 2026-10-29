@@ -1,70 +1,97 @@
-# Deployment Guide
+# Deployment Guide - Vercel + Supabase
 
 ## Architecture
-- **Frontend:** Vercel (static files)
-- **Backend:** Render (Express + Socket.io)
-- **Database:** Supabase
+- **Frontend:** Vercel (static files + serverless API)
+- **Backend:** Vercel Serverless Functions
+- **Database:** Supabase (PostgreSQL + Realtime)
+- **Real-time:** Supabase Realtime (replaces Socket.io)
 
-## Step 1: Deploy Backend to Render
+## Pre-Deployment Setup
 
-1. **Push your code to GitHub** (if not already done)
-2. **Go to [render.com](https://render.com) and sign up**
-3. **Create a new Web Service:**
-   - Click "New +"
-   - Select "Web Service"
-   - Connect your GitHub repository
-   - Select the "core social" repository
-   - **Build Command:** `cd server && npm install`
-   - **Start Command:** `cd server && npm start`
-   - **Root Directory:** Leave empty (or set to root)
-   - **Runtime:** Node
+### 1. Configure Supabase Credentials in Frontend
+Edit `client/config.js` and replace with your actual Supabase credentials:
+```javascript
+window.SUPABASE_URL = 'https://your-project-id.supabase.co';
+window.SUPABASE_ANON_KEY = 'your-anon-key-from-supabase-dashboard';
+```
 
-4. **Add Environment Variables** (in Render dashboard):
-   Copy these from your local `server/.env` file:
-   - `DATABASE_URL` - Your Supabase connection string
-   - `DATABASE_SSL` - `true`
-   - `SESSION_SECRET` - Generate a random string
-   - `CLOUDINARY_CLOUD_NAME` - From Cloudinary
-   - `CLOUDINARY_API_KEY` - From Cloudinary
-   - `CLOUDINARY_API_SECRET` - From Cloudinary
-   - `STRIPE_SECRET_KEY` - From Stripe
-   - `VAPID_PUBLIC_KEY` - From your local .env
-   - `VAPID_PRIVATE_KEY` - From your local .env
-   - `VAPID_EMAIL` - Your email
-   - `APP_URL` - Your Render URL (e.g., `https://core-social-backend.onrender.com`)
+Get these from: Supabase Dashboard → Settings → API
 
-5. **Deploy** - Render will automatically deploy
+### 2. Enable Supabase Realtime
+Go to your Supabase project:
+1. Navigate to Database → Replication
+2. Enable Realtime for the following tables:
+   - `messages`
+   - `notifications`
+3. Add publication for `supabase_realtime`
 
-6. **Copy your Render URL** (e.g., `https://core-social-backend.onrender.com`)
+### 3. Add Environment Variables to Vercel
+In your Vercel project settings → Environment Variables:
 
-## Step 2: Update Frontend
+```
+DATABASE_URL=your_supabase_connection_string
+DATABASE_SSL=true
+SESSION_SECRET=your_random_secret_string
+CLOUDINARY_CLOUD_NAME=your_cloudinary_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+STRIPE_SECRET_KEY=your_stripe_secret_key
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_EMAIL=your_email
+```
 
-1. **Go to your Vercel project**
-2. **Add Environment Variable:**
-   - Key: `API_URL`
-   - Value: Your Render backend URL (e.g., `https://core-social-backend.onrender.com`)
-3. **Redeploy** - Vercel will automatically redeploy
+## Deployment Steps
 
-## Step 3: Test
+### 1. Update client/config.js
+Make sure you've added your Supabase credentials to `client/config.js` before deploying.
 
-1. **Visit your Vercel frontend URL**
-2. **Test messaging** - Socket.io should connect to your Render backend
-3. **Test auth** - Should work with your Supabase database
+### 2. Push to GitHub
+```bash
+git add .
+git commit -m "Migrate to Vercel + Supabase Realtime"
+git push
+```
 
-## Troubleshooting
+### 3. Deploy to Vercel
+1. Go to your Vercel dashboard
+2. Your project should auto-deploy on push
+3. If not, click "Redeploy"
 
-### Socket.io connection fails
-- Check Render logs for WebSocket errors
-- Ensure `APP_URL` in Render env matches your Render URL
-- Check that your firewall allows WebSocket connections
+### 4. Verify Deployment
+- Visit your Vercel URL
+- Test authentication
+- Test messaging (real-time via Supabase)
+- Check notifications
 
-### Database connection fails
-- Verify `DATABASE_URL` in Render matches your Supabase connection string
-- Ensure `DATABASE_SSL=true` is set
+## Changes Made
 
-### CORS errors
-- Check that your Express server allows requests from your Vercel domain
-- The server currently has `cors: { origin: "*" }` which should work
+### Removed
+- Socket.io server and client
+- WebSocket connections
+- Continuous Express server
+- Cloudflare configuration
+
+### Added
+- Supabase Realtime subscriptions for messages and notifications
+- Vercel serverless function structure
+- REST API endpoints for message sending
+- Real-time database triggers
+- `client/config.js` for Supabase credentials
+
+### What Still Works
+- Authentication (sessions)
+- File uploads (Cloudinary)
+- Stripe payments
+- User profiles
+- Posts and feed
+- Messaging (now via Supabase Realtime)
+- Notifications (now via Supabase Realtime)
+
+### What Changed
+- **Typing indicators:** Removed (would require additional Supabase table)
+- **Message delivery receipts:** Now work via database triggers instead of WebSocket
+- **Real-time updates:** Now use Supabase Realtime instead of Socket.io
 
 ## Local Development
 
@@ -75,4 +102,27 @@ npm install
 npm start
 ```
 
-Frontend will connect to `localhost:3000` automatically.
+Make sure `client/config.js` has your Supabase credentials. The frontend will connect to `localhost:3000` and use Supabase Realtime for real-time features.
+
+## Troubleshooting
+
+### Real-time not working
+- Verify Supabase Realtime is enabled for `messages` and `notifications` tables
+- Check that `client/config.js` has correct `SUPABASE_URL` and `SUPABASE_ANON_KEY`
+- Check browser console for connection errors
+
+### Database connection fails
+- Verify `DATABASE_URL` in Vercel env matches your Supabase connection string
+- Ensure `DATABASE_SSL=true` is set
+
+### Session issues
+- Check that `SESSION_SECRET` is set in Vercel
+- Vercel serverless functions handle sessions differently - ensure cookies are being set correctly
+
+### API routes not working
+- Verify the `api/` directory structure is correct
+- Check Vercel function logs for errors
+
+### Supabase credentials error
+- Make sure you updated `client/config.js` with your actual credentials
+- Do not commit real credentials to public repositories

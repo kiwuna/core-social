@@ -1,4 +1,7 @@
-const API_URL = process.env.API_URL || window.location.origin; 
+const API_URL = window.location.origin;
+const SUPABASE_URL = window.SUPABASE_URL || 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const CURRENT_TIME = new Date();
 
 function timeAgo(date) {
@@ -3341,22 +3344,23 @@ let typingIndicatorTimer = null;
 let typingStateTimeout = null;
 let activeTypingFromUserId = null;
 let chatSeenScrollHandlerBound = false;
+let messageSubscription = null;
+let notificationSubscription = null;
+let typingSubscription = null;
 
 function initSocket() {
-  if (!socket && currentUser) {
-    const socketUrl = API_URL.replace(/\/$/, '');
-    socket = io(socketUrl);
-    socket.on('connect', () => {
-      socket.emit('register', currentUser.id);
-    });
+  if (!currentUser) return;
 
-    socket.on('new_notification', (notification) => {
-      if (notification && notification.type === 'message') {
-        updateNotificationBadge(true);
-      }
-    });
-
-    socket.on('receive_message', (msg) => {
+  // Subscribe to new messages
+  messageSubscription = supabase
+    .channel('messages-channel')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages',
+      filter: `receiver_id=eq.${currentUser.id}`
+    }, (payload) => {
+      const msg = payload.new;
       if (msg.sender_id !== currentUser.id) {
         updateNotificationBadge(true);
       }
@@ -3372,19 +3376,27 @@ function initSocket() {
           showFeedback("New message received", "info");
         }
       }
-    });
+    })
+    .subscribe();
 
-    socket.on('typing', ({ fromUserId, isTyping }) => {
-      if (!currentChatUserId || Number(currentChatUserId) !== Number(fromUserId)) return;
-      activeTypingFromUserId = isTyping ? Number(fromUserId) : null;
-      renderTypingIndicator(isTyping);
-    });
+  // Subscribe to notifications
+  notificationSubscription = supabase
+    .channel('notifications-channel')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'notifications',
+      filter: `recipient_id=eq.${currentUser.id}`
+    }, (payload) => {
+      const notification = payload.new;
+      if (notification && notification.type === 'message') {
+        updateNotificationBadge(true);
+      }
+    })
+    .subscribe();
 
-    socket.on('message_state_update', ({ messageId, seen_at, delivered_at, chatUserId }) => {
-      if (!currentChatUserId || Number(currentChatUserId) !== Number(chatUserId)) return;
-      updateMessageState(messageId, { seen_at, delivered_at });
-    });
-  }
+  // Note: Typing indicators require a separate table or approach
+  // For now, we'll use a polling approach or you can create a typing table
 }
 
 function renderTypingIndicator(isTyping) {
@@ -3575,7 +3587,12 @@ function markVisibleMessagesSeen() {
     const visible = rect.bottom > containerRect.top && rect.top < containerRect.bottom;
     if (visible) {
       bubble.dataset.seenSent = "1";
-      socket.emit("message_seen", { messageId, chatUserId: Number(currentChatUserId) });
+      // Mark as seen via API
+      fetch(`${API_URL}/api/messages/${messageId}/seen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
       const status = bubble.querySelector(".message-status");
       if (status) status.textContent = "Seen";
     }
@@ -3589,14 +3606,19 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       const input = document.getElementById("chatInput");
       const text = input.value.trim();
-      if (!text || !currentChatUserId || !socket) return;
-      
-      socket.emit("send_message", {
-        sender_id: currentUser.id,
-        receiver_id: Number(currentChatUserId),
-        content: text
+      if (!text || !currentChatUserId) return;
+
+      fetch(`${API_URL}/api/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          sender_id: currentUser.id,
+          receiver_id: Number(currentChatUserId),
+          content: text
+        })
       });
-      
+
       input.value = "";
     });
   }
@@ -3604,16 +3626,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("input", (e) => {
   const input = e.target;
-  if (!input || input.id !== "chatInput" || !socket || !currentChatUserId || !currentUser) return;
-  socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: true });
+  if (!input || input.id !== "chatInput" || !currentChatUserId || !currentUser) return;
+  // Typing indicators removed - would require additional Supabase table
+  // You can add this later with a typing_events table
   clearTimeout(typingStateTimeout);
   typingStateTimeout = setTimeout(() => {
-    socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
+    // Stop typing
   }, 900);
 });
 
 window.addEventListener("blur", () => {
-  if (socket && currentChatUserId) socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
+  // Stop typing on blur
 });
 
 if (enablePushBtn) {

@@ -110,66 +110,26 @@ router.get("/:userId", async (req, res) => {
       [friendId, currentUserId]
     );
 
+    if (undelivered.rows.length && req.app && req.app.get && req.app.get("io")) {
+      const io = req.app.get("io");
+      const userSockets = req.app.get("userSockets");
+      if (userSockets && userSockets.has(friendId)) {
+        for (const senderSocketId of userSockets.get(friendId)) {
+          undelivered.rows.forEach((row) => {
+            io.to(senderSocketId).emit("message_state_update", {
+              messageId: row.id,
+              delivered_at: row.delivered_at,
+              seen_at: row.seen_at,
+              chatUserId: currentUserId
+            });
+          });
+        }
+      }
+    }
+
     res.json(result.rows);
   } catch (err) {
     console.error("Error fetching messages:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// Send a message
-router.post("/", async (req, res) => {
-  if (!req.session || !req.session.userId) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const { sender_id, receiver_id, content } = req.body;
-  const currentUserId = req.session.userId;
-
-  if (sender_id !== currentUserId) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-
-  try {
-    const result = await db.query(
-      "INSERT INTO messages (sender_id, receiver_id, content, delivered_at) VALUES ($1, $2, $3, NOW()) RETURNING *",
-      [sender_id, receiver_id, content]
-    );
-
-    // Add notification
-    await db.query(
-      "INSERT INTO notifications (type, recipient_id, sender_id) VALUES ($1, $2, $3)",
-      ["message", receiver_id, sender_id]
-    );
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error("Error sending message:", err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-// Mark message as seen
-router.post("/:messageId/seen", async (req, res) => {
-  if (!req.session || !req.session.userId) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const messageId = Number(req.params.messageId);
-  const currentUserId = req.session.userId;
-
-  try {
-    const result = await db.query(
-      `UPDATE messages
-       SET seen_at = COALESCE(seen_at, NOW())
-       WHERE id = $1 AND receiver_id = $2
-       RETURNING id, sender_id, receiver_id, seen_at, delivered_at`,
-      [messageId, currentUserId]
-    );
-
-    res.json(result.rows[0] || {});
-  } catch (err) {
-    console.error("Error marking message as seen:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

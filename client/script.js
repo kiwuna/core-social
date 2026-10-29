@@ -1,7 +1,4 @@
-const API_URL = window.location.origin;
-const SUPABASE_URL = window.SUPABASE_URL || 'YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const API_URL = "";
 const CURRENT_TIME = new Date();
 
 function timeAgo(date) {
@@ -3344,59 +3341,58 @@ let typingIndicatorTimer = null;
 let typingStateTimeout = null;
 let activeTypingFromUserId = null;
 let chatSeenScrollHandlerBound = false;
-let messageSubscription = null;
-let notificationSubscription = null;
-let typingSubscription = null;
+let socket;
 
 function initSocket() {
-  if (!currentUser) return;
-
-  // Subscribe to new messages
-  messageSubscription = supabase
-    .channel('messages-channel')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'messages',
-      filter: `receiver_id=eq.${currentUser.id}`
-    }, (payload) => {
-      const msg = payload.new;
-      if (msg.sender_id !== currentUser.id) {
-        updateNotificationBadge(true);
+  if (!socket && currentUser) {
+    try {
+      if (typeof io === 'undefined') {
+        console.warn('Socket.io not loaded - real-time features disabled');
+        return;
       }
+      socket = io(API_URL);
+      socket.on('connect', () => {
+        socket.emit('register', currentUser.id);
+      });
 
-      if (currentChatUserId && (msg.sender_id === Number(currentChatUserId) || msg.receiver_id === Number(currentChatUserId))) {
-        appendMessage(msg);
-        scrollToBottom();
-        requestAnimationFrame(() => {
-          markVisibleMessagesSeen();
-        });
-      } else {
-        if (msg.sender_id !== currentUser.id) {
-          showFeedback("New message received", "info");
+      socket.on('new_notification', (notification) => {
+        if (notification && notification.type === 'message') {
+          updateNotificationBadge(true);
         }
-      }
-    })
-    .subscribe();
+      });
 
-  // Subscribe to notifications
-  notificationSubscription = supabase
-    .channel('notifications-channel')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'notifications',
-      filter: `recipient_id=eq.${currentUser.id}`
-    }, (payload) => {
-      const notification = payload.new;
-      if (notification && notification.type === 'message') {
-        updateNotificationBadge(true);
-      }
-    })
-    .subscribe();
+      socket.on('receive_message', (msg) => {
+        if (msg.sender_id !== currentUser.id) {
+          updateNotificationBadge(true);
+        }
 
-  // Note: Typing indicators require a separate table or approach
-  // For now, we'll use a polling approach or you can create a typing table
+        if (currentChatUserId && (msg.sender_id === Number(currentChatUserId) || msg.receiver_id === Number(currentChatUserId))) {
+          appendMessage(msg);
+          scrollToBottom();
+          requestAnimationFrame(() => {
+            markVisibleMessagesSeen();
+          });
+        } else {
+          if (msg.sender_id !== currentUser.id) {
+            showFeedback("New message received", "info");
+          }
+        }
+      });
+
+      socket.on('typing', ({ fromUserId, isTyping }) => {
+        if (!currentChatUserId || Number(currentChatUserId) !== Number(fromUserId)) return;
+        activeTypingFromUserId = isTyping ? Number(fromUserId) : null;
+        renderTypingIndicator(isTyping);
+      });
+
+      socket.on('message_state_update', ({ messageId, seen_at, delivered_at, chatUserId }) => {
+        if (!currentChatUserId || Number(currentChatUserId) !== Number(chatUserId)) return;
+        updateMessageState(messageId, { seen_at, delivered_at });
+      });
+    } catch (e) {
+      console.warn('Socket.io initialization failed - real-time features disabled');
+    }
+  }
 }
 
 function renderTypingIndicator(isTyping) {
@@ -3587,12 +3583,7 @@ function markVisibleMessagesSeen() {
     const visible = rect.bottom > containerRect.top && rect.top < containerRect.bottom;
     if (visible) {
       bubble.dataset.seenSent = "1";
-      // Mark as seen via API
-      fetch(`${API_URL}/api/messages/${messageId}/seen`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
+      socket.emit("message_seen", { messageId, chatUserId: Number(currentChatUserId) });
       const status = bubble.querySelector(".message-status");
       if (status) status.textContent = "Seen";
     }
@@ -3606,17 +3597,12 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       const input = document.getElementById("chatInput");
       const text = input.value.trim();
-      if (!text || !currentChatUserId) return;
+      if (!text || !currentChatUserId || !socket) return;
 
-      fetch(`${API_URL}/api/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          sender_id: currentUser.id,
-          receiver_id: Number(currentChatUserId),
-          content: text
-        })
+      socket.emit("send_message", {
+        sender_id: currentUser.id,
+        receiver_id: Number(currentChatUserId),
+        content: text
       });
 
       input.value = "";
@@ -3626,17 +3612,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("input", (e) => {
   const input = e.target;
-  if (!input || input.id !== "chatInput" || !currentChatUserId || !currentUser) return;
-  // Typing indicators removed - would require additional Supabase table
-  // You can add this later with a typing_events table
+  if (!input || input.id !== "chatInput" || !socket || !currentChatUserId || !currentUser) return;
+  socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: true });
   clearTimeout(typingStateTimeout);
   typingStateTimeout = setTimeout(() => {
-    // Stop typing
+    socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
   }, 900);
 });
 
 window.addEventListener("blur", () => {
-  // Stop typing on blur
+  if (socket && currentChatUserId) socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
 });
 
 if (enablePushBtn) {

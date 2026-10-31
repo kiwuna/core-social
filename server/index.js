@@ -22,16 +22,6 @@ app.locals.db = db;
 
 // Session configuration - disable for serverless or use memory store
 if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  // Normalize req.url if Vercel rewrite changed it
-  app.use((req, res, next) => {
-    if (req.headers["x-matched-path"]) {
-      // Vercel header available in serverless
-    }
-    if (req.originalUrl && req.url !== req.originalUrl) {
-      req.url = req.originalUrl;
-    }
-    next();
-  });
   // In serverless, use memory store (sessions won't persist across invocations)
   // For production, consider using Vercel KV or Redis
   app.use(

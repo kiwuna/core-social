@@ -2,42 +2,7 @@
   "outputDirectory": "client",
   "cleanUrls": true,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/auth/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/posts/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/users/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/feed/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/notifications/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/create-checkout-session",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/checkout-success",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/health",
-      "destination": "/api/index.js"
-    }
+    { "source": "/(.*)", "destination": "/api/index.js" }
   ],
   "headers": [
     {

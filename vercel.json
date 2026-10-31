@@ -1,4 +1,5 @@
 {
+  "outputDirectory": "client",
   "cleanUrls": true,
   "rewrites": [
     {
@@ -36,14 +37,6 @@
     {
       "source": "/health",
       "destination": "/api/index.js"
-    },
-    {
-      "source": "/",
-      "destination": "/client/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/client/$1"
     }
   ],
   "headers": [

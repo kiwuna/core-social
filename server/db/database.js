@@ -310,11 +310,8 @@ const initDb = async () => {
   }
 };
 
-// Only initialize DB if not in serverless environment
-if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  // Don't auto-init in serverless
-  console.log("Serverless environment detected - skipping auto DB init");
-} else {
+// Only initialize DB locally - production DB should already have tables
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
   initDb();
 }
 

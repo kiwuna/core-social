@@ -20,23 +20,40 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 app.locals.db = db;
 
-// Session configuration
-app.use(
-  session({
-    store: new PgStore({
-      pool: db,
-      tableName: "session",
-    }),
-    secret: process.env.SESSION_SECRET || "core-social-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-      httpOnly: true, // Security: prevents client-side JS from reading the cookie
-      sameSite: "lax",
-    },
-  })
-);
+// Session configuration - disable for serverless or use memory store
+if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  // In serverless, use memory store (sessions won't persist across invocations)
+  // For production, consider using Vercel KV or Redis
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || "core-social-secret-key",
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+        httpOnly: true,
+        sameSite: "lax",
+      },
+    })
+  );
+} else {
+  app.use(
+    session({
+      store: new PgStore({
+        pool: db,
+        tableName: "session",
+      }),
+      secret: process.env.SESSION_SECRET || "core-social-secret-key",
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+        httpOnly: true, // Security: prevents client-side JS from reading the cookie
+        sameSite: "lax",
+      },
+    })
+  );
+}
 
 app.disable("x-powered-by");
 app.use(express.json({ limit: "10kb" }));

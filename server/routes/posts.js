@@ -11,9 +11,13 @@ const VIEW_MIN_TOTAL_MS = Number(process.env.VIEW_MIN_TOTAL_MS) || 2000;
 const VIEW_HEARTBEAT_MAX_AGE_MS = Number(process.env.VIEW_HEARTBEAT_MAX_AGE_MS) || 15000;
 const uploadsDirectory = path.join(__dirname, "..", "uploads");
 
-// Only create uploads directory if not in Vercel
-if (!process.env.VERCEL) {
-  fs.mkdirSync(uploadsDirectory, { recursive: true });
+// Skip local uploads dir on Vercel (read-only filesystem) — Cloudinary handles storage
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  try {
+    fs.mkdirSync(uploadsDirectory, { recursive: true });
+  } catch (e) {
+    // Non-fatal: uploads dir is only needed for local disk storage fallback
+  }
 }
 
 const { v2: cloudinary } = require("cloudinary");

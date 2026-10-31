@@ -1,6 +1,5 @@
 {
   "outputDirectory": "client",
-  "cleanUrls": true,
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index.js" }
   ],

@@ -17,6 +17,12 @@ const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
+// DEBUG: log every incoming request (remove after diagnosing)
+app.use((req, res, next) => {
+  console.log(`[REQ] method=${req.method} url=${req.url} originalUrl=${req.originalUrl} path=${req.path}`);
+  next();
+});
+
 const PORT = Number(process.env.PORT) || 3000;
 app.locals.db = db;
 

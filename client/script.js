@@ -532,7 +532,6 @@ async function fetchCurrentUser() {
       currentUser = data.user;
       updateAuthUI();
       checkUserWarnings();
-      if(typeof initSocket === 'function') initSocket();
     } else if (res.status === 403) {
       const data = await res.json();
       if (data.error === "suspended") {
@@ -3335,79 +3334,11 @@ async function handlePostMenuAction(postElement, action, postId) {
 // Messaging Logic
 // ═══════════════════════════════════════
 
-let socket;
 let currentChatUserId = null;
 let typingIndicatorTimer = null;
 let typingStateTimeout = null;
 let activeTypingFromUserId = null;
 let chatSeenScrollHandlerBound = false;
-let socket;
-
-function initSocket() {
-  if (!socket && currentUser) {
-    try {
-      if (typeof io === 'undefined') {
-        console.warn('Socket.io not loaded - real-time features disabled');
-        return;
-      }
-      socket = io(API_URL);
-      socket.on('connect', () => {
-        socket.emit('register', currentUser.id);
-      });
-
-      socket.on('new_notification', (notification) => {
-        if (notification && notification.type === 'message') {
-          updateNotificationBadge(true);
-        }
-      });
-
-      socket.on('receive_message', (msg) => {
-        if (msg.sender_id !== currentUser.id) {
-          updateNotificationBadge(true);
-        }
-
-        if (currentChatUserId && (msg.sender_id === Number(currentChatUserId) || msg.receiver_id === Number(currentChatUserId))) {
-          appendMessage(msg);
-          scrollToBottom();
-          requestAnimationFrame(() => {
-            markVisibleMessagesSeen();
-          });
-        } else {
-          if (msg.sender_id !== currentUser.id) {
-            showFeedback("New message received", "info");
-          }
-        }
-      });
-
-      socket.on('typing', ({ fromUserId, isTyping }) => {
-        if (!currentChatUserId || Number(currentChatUserId) !== Number(fromUserId)) return;
-        activeTypingFromUserId = isTyping ? Number(fromUserId) : null;
-        renderTypingIndicator(isTyping);
-      });
-
-      socket.on('message_state_update', ({ messageId, seen_at, delivered_at, chatUserId }) => {
-        if (!currentChatUserId || Number(currentChatUserId) !== Number(chatUserId)) return;
-        updateMessageState(messageId, { seen_at, delivered_at });
-      });
-    } catch (e) {
-      console.warn('Socket.io initialization failed - real-time features disabled');
-    }
-  }
-}
-
-function renderTypingIndicator(isTyping) {
-  const chatMessages = document.getElementById("chatMessages");
-  if (!chatMessages) return;
-  let indicator = document.getElementById("typingIndicator");
-  if (!indicator) {
-    indicator = document.createElement("div");
-    indicator.id = "typingIndicator";
-    indicator.style.cssText = "padding:10px 16px;color:var(--muted);font-size:12px;text-align:left;";
-  }
-  indicator.textContent = isTyping ? "Typing..." : "";
-  indicator.style.display = isTyping ? "block" : "none";
-  chatMessages.appendChild(indicator);
-}
 
 function getMessageStatusLabel(msg) {
   if (msg.seen_at) return "Seen";
@@ -3470,7 +3401,6 @@ async function showMessages(friendId) {
     return;
   }
   
-  if (!socket) initSocket();
   hideAllViews();
   currentChatUserId = Number(friendId);
   if (messagesView) messagesView.classList.remove("hidden");
@@ -3569,7 +3499,7 @@ function scrollToBottom() {
 }
 
 function markVisibleMessagesSeen() {
-  if (!socket || !currentChatUserId) return;
+  if (!currentChatUserId) return;
   const chatMessages = document.getElementById("chatMessages");
   if (!chatMessages) return;
   const containerRect = chatMessages.getBoundingClientRect();
@@ -3583,7 +3513,10 @@ function markVisibleMessagesSeen() {
     const visible = rect.bottom > containerRect.top && rect.top < containerRect.bottom;
     if (visible) {
       bubble.dataset.seenSent = "1";
-      socket.emit("message_seen", { messageId, chatUserId: Number(currentChatUserId) });
+      fetch(`/api/messages/${messageId}/seen`, {
+        method: "POST",
+        credentials: "include"
+      }).catch(err => console.error("Error marking message as seen:", err));
       const status = bubble.querySelector(".message-status");
       if (status) status.textContent = "Seen";
     }
@@ -3593,35 +3526,49 @@ function markVisibleMessagesSeen() {
 document.addEventListener("DOMContentLoaded", () => {
   const chatForm = document.getElementById("chatForm");
   if (chatForm) {
-    chatForm.addEventListener("submit", (e) => {
+    chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = document.getElementById("chatInput");
       const text = input.value.trim();
-      if (!text || !currentChatUserId || !socket) return;
+      if (!text || !currentChatUserId) return;
 
-      socket.emit("send_message", {
-        sender_id: currentUser.id,
-        receiver_id: Number(currentChatUserId),
-        content: text
-      });
-
-      input.value = "";
+      try {
+        const res = await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            receiver_id: Number(currentChatUserId),
+            content: text
+          })
+        });
+        
+        if (res.ok) {
+          const msg = await res.json();
+          appendMessage(msg);
+          scrollToBottom();
+          input.value = "";
+        }
+      } catch (err) {
+        console.error("Error sending message:", err);
+        showFeedback("Failed to send message", "error");
+      }
     });
   }
 });
 
 document.addEventListener("input", (e) => {
   const input = e.target;
-  if (!input || input.id !== "chatInput" || !socket || !currentChatUserId || !currentUser) return;
-  socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: true });
+  if (!input || input.id !== "chatInput" || !currentChatUserId || !currentUser) return;
+  // Typing indicators removed - not supported without Socket.io
   clearTimeout(typingStateTimeout);
   typingStateTimeout = setTimeout(() => {
-    socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
+    // Typing stopped
   }, 900);
 });
 
 window.addEventListener("blur", () => {
-  if (socket && currentChatUserId) socket.emit("typing", { toUserId: Number(currentChatUserId), isTyping: false });
+  // Typing indicators removed - not supported without Socket.io
 });
 
 if (enablePushBtn) {

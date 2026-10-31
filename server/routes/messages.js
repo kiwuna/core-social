@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db/database");
+const { sendMessagePush } = require("./push");
 
 // Fetch conversation list for logged-in user
 router.get("/conversations", async (req, res) => {
@@ -102,34 +103,94 @@ router.get("/:userId", async (req, res) => {
       [currentUserId, friendId]
     );
 
-    const undelivered = await db.query(
+    await db.query(
       `UPDATE messages
        SET delivered_at = COALESCE(delivered_at, NOW())
-       WHERE sender_id = $1 AND receiver_id = $2 AND delivered_at IS NULL
-       RETURNING id, sender_id, receiver_id, delivered_at, seen_at`,
+       WHERE sender_id = $1 AND receiver_id = $2 AND delivered_at IS NULL`,
       [friendId, currentUserId]
     );
-
-    if (undelivered.rows.length && req.app && req.app.get && req.app.get("io")) {
-      const io = req.app.get("io");
-      const userSockets = req.app.get("userSockets");
-      if (userSockets && userSockets.has(friendId)) {
-        for (const senderSocketId of userSockets.get(friendId)) {
-          undelivered.rows.forEach((row) => {
-            io.to(senderSocketId).emit("message_state_update", {
-              messageId: row.id,
-              delivered_at: row.delivered_at,
-              seen_at: row.seen_at,
-              chatUserId: currentUserId
-            });
-          });
-        }
-      }
-    }
 
     res.json(result.rows);
   } catch (err) {
     console.error("Error fetching messages:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Send a message
+router.post("/", async (req, res) => {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { receiver_id, content } = req.body;
+  const sender_id = req.session.userId;
+
+  if (!receiver_id || !content) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    const result = await db.query(
+      "INSERT INTO messages (sender_id, receiver_id, content, delivered_at) VALUES ($1, $2, $3, NOW()) RETURNING *",
+      [sender_id, receiver_id, content]
+    );
+    const savedMessage = result.rows[0];
+
+    await db.query(
+      "INSERT INTO notifications (type, recipient_id, sender_id) VALUES ($1, $2, $3)",
+      ["message", receiver_id, sender_id]
+    );
+
+    // Send push notification
+    try {
+      await sendMessagePush(db, receiver_id, {
+        title: "New message",
+        body: content,
+        url: `/messages/${sender_id}`,
+        icon: "/assets/CoreLogo.png",
+        badge: "/assets/CoreLogo.png"
+      });
+    } catch (pushErr) {
+      console.error("Push notification error:", pushErr.message);
+    }
+
+    res.json(savedMessage);
+  } catch (err) {
+    console.error("Error sending message:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Mark message as seen
+router.post("/:messageId/seen", async (req, res) => {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const messageId = Number(req.params.messageId);
+  const viewerId = req.session.userId;
+
+  if (!Number.isInteger(messageId) || messageId <= 0) {
+    return res.status(400).json({ error: "Invalid message id" });
+  }
+
+  try {
+    const result = await db.query(
+      `UPDATE messages
+       SET seen_at = COALESCE(seen_at, NOW())
+       WHERE id = $1 AND receiver_id = $2
+       RETURNING id, sender_id, receiver_id, seen_at, delivered_at`,
+      [messageId, viewerId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error marking message as seen:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

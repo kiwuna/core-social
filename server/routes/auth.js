@@ -9,6 +9,11 @@ const { isAuthenticated } = require("../middleware/auth");
 const { v2: cloudinary } = require("cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
+// Check if Cloudinary is properly configured
+if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+  console.warn("WARNING: Cloudinary API credentials not configured. Image uploads will fail.");
+}
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_NAME || "dtfjqbkas",
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -245,14 +250,15 @@ router.post("/upload-avatar", isAuthenticated, uploadAvatar.single("avatar"), as
   try {
     const result = await db.query("SELECT avatar_path FROM users WHERE id = $1", [userId]);
     const user = result.rows[0];
-    
+
     if (!user) return res.status(404).json({ error: "User not found." });
 
     // req.file.path contains the Cloudinary URL
-    const avatarPath = req.file.path; 
+    const avatarPath = req.file.path;
     await db.query("UPDATE users SET avatar_path = $1 WHERE id = $2", [avatarPath, userId]);
     res.json({ avatar_path: avatarPath });
   } catch (err) {
+    console.error("Avatar upload error:", err);
     next(err);
   }
 });

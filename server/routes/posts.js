@@ -23,11 +23,6 @@ if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
 const { v2: cloudinary } = require("cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-// Check if Cloudinary is properly configured
-if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-  console.warn("WARNING: Cloudinary API credentials not configured. Image uploads will fail.");
-}
-
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_NAME || "dtfjqbkas",
   api_key: process.env.CLOUDINARY_API_KEY,

@@ -235,7 +235,7 @@
 
     async function logoutAndRedirect() {
       try {
-        await fetch("/auth/logout", { method: "POST" });
+        await fetch("/auth/logout", { method: "POST", credentials: "include" });
       } catch (err) {
         // Suppress network errors
       }

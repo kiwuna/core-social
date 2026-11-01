@@ -776,7 +776,7 @@
     // Authenticate and authorize admin
     async function checkAuth() {
       try {
-        const res = await fetch("/auth/me");
+        const res = await fetch("/auth/me", { credentials: "include" });
         if (!res.ok) {
           window.location.href = "/login.html";
           return;
@@ -804,7 +804,7 @@
 
     async function loadStats() {
       try {
-        const res = await fetch("/api/admin/stats");
+        const res = await fetch("/api/admin/stats", { credentials: "include" });
         if (res.ok) {
           const stats = await res.json();
           document.getElementById("statTotalUsers").textContent = stats.totalUsers;
@@ -819,7 +819,7 @@
 
     async function loadUsers() {
       try {
-        const res = await fetch("/api/admin/users");
+        const res = await fetch("/api/admin/users", { credentials: "include" });
         if (res.ok) {
           allUsers = await res.json();
           renderUsers(allUsers);
@@ -954,6 +954,7 @@
         const res = await fetch(`/api/admin/warn/${userId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ reason })
         });
 
@@ -974,7 +975,8 @@
       if (!confirm("Delete this user and all of their posts, comments, likes, and messages?")) return;
       try {
         const res = await fetch(`/api/admin/users/${userId}`, {
-          method: "DELETE"
+          method: "DELETE",
+          credentials: "include"
         });
         if (res.ok) {
           showFeedback("User deleted successfully", "success");
@@ -1057,6 +1059,7 @@
         const res = await fetch(`/api/admin/users/${userId}/edit`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             role,
             suspensionDuration,

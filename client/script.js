@@ -721,7 +721,7 @@ function showWarningModalDirectly() {
       warningModalClose.onclick = async () => {
         warningModal.classList.remove("show");
         try {
-          await fetch("/auth/acknowledge-warning", { method: "POST" });
+          await fetch("/auth/acknowledge-warning", { method: "POST", credentials: "include" });
           currentUser.acknowledged_warnings = currentUser.warnings;
         } catch (err) {
           console.error("Failed to acknowledge warning:", err);
@@ -921,7 +921,7 @@ function createPostElement(post) {
   // Load live analytics after the card is on the page.
   queueMicrotask(async () => {
     try {
-      const res = await fetch(`${API_URL}/posts/${post.id}/views`);
+      const res = await fetch(`${API_URL}/posts/${post.id}/views`, { credentials: "include" });
       if (!res.ok) return;
       const data = await res.json();
       const viewsEl = postElement.querySelector(".views-count");
@@ -976,6 +976,7 @@ function createPostElement(post) {
             const res = await fetch(`${API_URL}/posts/${post.id}/vote`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({ optionId })
             });
             
@@ -1140,14 +1141,14 @@ async function showProfile(userId) {
   replayStaggeredAnimations(profileView, ".profile-loading");
 
   try {
-    const userRes = await fetch(`/auth/users/${userId}`);
+    const userRes = await fetch(`/auth/users/${userId}`, { credentials: "include" });
     if (!userRes.ok) throw new Error("User not found");
     const userData = (await userRes.json()).user;
 
-    const postsRes = await fetch(`/posts/user/${userId}`);
+    const postsRes = await fetch(`/posts/user/${userId}`, { credentials: "include" });
     const userPosts = await postsRes.json();
 
-    const followRes = await fetch(`/users/${userId}/follow-status`);
+    const followRes = await fetch(`/users/${userId}/follow-status`, { credentials: "include" });
     const followData = await followRes.json();
 
     const isMe = currentUser && String(currentUser.id) === String(userId);
@@ -1267,7 +1268,7 @@ async function showProfile(userId) {
           <span>Loading likes...</span>
         </div>`;
       try {
-        const likesRes = await fetch(`/users/${userId}/likes`);
+        const likesRes = await fetch(`/users/${userId}/likes`, { credentials: "include" });
         const likedPosts = await likesRes.json();
         renderPosts(likedPosts);
       } catch (e) {
@@ -1329,7 +1330,7 @@ async function showMessagesList() {
     </div>`;
 
   try {
-    const res = await fetch("/api/messages/conversations");
+    const res = await fetch("/api/messages/conversations", { credentials: "include" });
     if (!res.ok) throw new Error("Failed");
     let chats = await res.json();
 
@@ -1338,7 +1339,7 @@ async function showMessagesList() {
     if (!Array.isArray(chats) || chats.length === 0) {
       // Fallback: build a lightweight chat list from message notifications
       try {
-        const nres = await fetch("/notifications");
+        const nres = await fetch("/notifications", { credentials: "include" });
         if (nres.ok) {
           const notifications = await nres.json();
           const seen = new Set();
@@ -1432,7 +1433,7 @@ async function showNotifications() {
     </div>`;
   
   try {
-    const res = await fetch("/notifications");
+    const res = await fetch("/notifications", { credentials: "include" });
     const notifications = await res.json();
     
     if (notifications.length === 0) {
@@ -1514,7 +1515,7 @@ async function showNotifications() {
     replayStaggeredAnimations(notificationsContent, ".notification-item");
 
     // Mark all as read
-    fetch("/notifications/read", { method: "POST" });
+    fetch("/notifications/read", { method: "POST", credentials: "include" });
     updateNotificationBadge(false);
   } catch (err) {
     notificationsContent.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--muted);">Error loading notifications.</div>`;
@@ -1524,7 +1525,7 @@ async function showNotifications() {
 async function deleteNotification(id, element) {
   showConfirm("Remove Notice?", "This notification will be permanently deleted from your feed.", async () => {
     try {
-      const res = await fetch(`/notifications/${id}`, { method: "DELETE" });
+      const res = await fetch(`/notifications/${id}`, { method: "DELETE", credentials: "include" });
       if (res.ok) {
         element.style.opacity = "0";
         setTimeout(() => {
@@ -1544,7 +1545,7 @@ async function deleteNotification(id, element) {
 async function clearAllNotifications() {
   showConfirm("Clear All?", "All notifications will be permanently removed. This cannot be undone.", async () => {
     try {
-      const res = await fetch("/notifications/clear-all", { method: "DELETE" });
+      const res = await fetch("/notifications/clear-all", { method: "DELETE", credentials: "include" });
       if (res.ok) {
         MapsTo('notifications');
         showFeedback("Inbox cleared", "success");
@@ -1572,7 +1573,7 @@ async function showReportsFolder() {
     </div>`;
   
   try {
-    const res = await fetch("/notifications/reports");
+    const res = await fetch("/notifications/reports", { credentials: "include" });
     const reports = await res.json();
     
     if (reports.length === 0) {
@@ -1671,7 +1672,7 @@ async function updateNotificationBadge(hasUnread) {
 async function checkUnreadNotifications() {
   if (!currentUser) return;
   try {
-    const res = await fetch("/notifications");
+    const res = await fetch("/notifications", { credentials: "include" });
     const notifications = await res.json();
     const hasUnread = notifications.some(n => !n.is_read);
     updateNotificationBadge(hasUnread);
@@ -1688,7 +1689,7 @@ async function showSinglePost(postId) {
     // We can reuse the existing search API or add a specific one. 
     // For now, let's just fetch all posts and find the one. 
     // Ideally, we'd have GET /posts/:id
-    const res = await fetch(`/posts`);
+    const res = await fetch(`/posts`, { credentials: "include" });
     const allPosts = await res.json();
     const post = allPosts.find(p => p.id === Number(postId));
     
@@ -1826,8 +1827,8 @@ async function performSearch(query) {
 
   try {
     const [usersRes, postsRes] = await Promise.all([
-      fetch(`${API_URL}/auth/users/search/${encodeURIComponent(query)}`),
-      fetch(`${API_URL}/posts/search?q=${encodeURIComponent(query)}`)
+      fetch(`${API_URL}/auth/users/search/${encodeURIComponent(query)}`, { credentials: "include" }),
+      fetch(`${API_URL}/posts/search?q=${encodeURIComponent(query)}`, { credentials: "include" })
     ]);
 
     cachedSearchUsers = usersRes.ok ? await usersRes.json() : [];
@@ -2013,6 +2014,7 @@ if (postForm) {
 
       const response = await fetch(`${API_URL}/posts`, {
         method: "POST",
+        credentials: "include",
         body: formData
       });
 
@@ -2112,7 +2114,7 @@ if (addPollOptionButton) {
 
 logoutBtn.addEventListener("click", async () => {
   await unsubscribeFromPush();
-  const res = await fetch("/auth/logout", { method: "POST" });
+  const res = await fetch("/auth/logout", { method: "POST", credentials: "include" });
   if (res.ok) window.location.reload();
 });
 
@@ -2204,7 +2206,7 @@ document.addEventListener("click", async (event) => {
     }
 
     try {
-      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE", credentials: "include" });
       if (res.ok) {
         postElement.remove();
         showFeedback("Deleted.", "success");
@@ -2232,7 +2234,7 @@ document.addEventListener("click", async (event) => {
     }
 
     try {
-      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE", credentials: "include" });
       if (res.ok) {
         postElement.remove();
         showFeedback("Post deleted by admin.", "success");
@@ -2418,7 +2420,7 @@ async function toggleComments(postId, postElement) {
   container.innerHTML = `<div style="padding: 20px; color: var(--muted); text-align: center;">Loading thoughts...</div>`;
 
   try {
-    const res = await fetch(`${API_URL}/posts/${postId}/comments`);
+    const res = await fetch(`${API_URL}/posts/${postId}/comments`, { credentials: "include" });
     const comments = await res.json();
     
     renderInlineComments(postId, postElement, comments);
@@ -2477,7 +2479,7 @@ function renderInlineComments(postId, postElement, comments) {
             credentials: "include"
           });
           if (res.ok) {
-            const refreshRes = await fetch(`${API_URL}/posts/${postId}/comments`);
+            const refreshRes = await fetch(`${API_URL}/posts/${postId}/comments`, { credentials: "include" });
             const updatedComments = await refreshRes.json();
             renderInlineComments(postId, postElement, updatedComments);
             const countEl = postElement.querySelector(".comments-count");
@@ -2512,7 +2514,7 @@ function renderInlineComments(postId, postElement, comments) {
           });
           if (postRes.ok) {
             input.value = "";
-            const refreshRes = await fetch(`${API_URL}/posts/${postId}/comments`);
+            const refreshRes = await fetch(`${API_URL}/posts/${postId}/comments`, { credentials: "include" });
             const updatedComments = await refreshRes.json();
             renderInlineComments(postId, postElement, updatedComments);
             
@@ -2625,6 +2627,7 @@ if (saveProfile) {
       const res = await fetch(`${API_URL}/auth/update-profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ username, display_name, bio })
       });
 
@@ -2684,7 +2687,7 @@ if (activateCoreFlowBtn) {
     activateCoreFlowBtn.textContent = 'Activating...';
     
     try {
-      const res = await fetch(`${API_URL}/auth/activate-premium`, { method: 'POST' });
+      const res = await fetch(`${API_URL}/auth/activate-premium`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         showFeedback(data.message, 'success');
@@ -2722,6 +2725,7 @@ if (avatarFileInput) {
       showFeedback('Uploading avatar...', 'info');
       const res = await fetch(`${API_URL}/auth/upload-avatar`, {
         method: 'POST',
+        credentials: 'include',
         body: formData
       });
 
@@ -2771,6 +2775,7 @@ if (bannerFileInput) {
       
       const res = await fetch(`${API_URL}/auth/upload-banner`, {
         method: 'POST',
+        credentials: 'include',
         body: formData
       });
 
@@ -2811,7 +2816,7 @@ if (removeBannerBtn) {
   removeBannerBtn.addEventListener('click', async () => {
     if (!confirm('Remove your custom banner?')) return;
     try {
-      const res = await fetch(`${API_URL}/auth/remove-banner`, { method: 'POST' });
+      const res = await fetch(`${API_URL}/auth/remove-banner`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
         currentUser.banner_path = null;
         bannerPreview.innerHTML = `<div class="banner-placeholder">Banner Preview</div>`;
@@ -2917,7 +2922,8 @@ if (activateCoreFlowModal) {
     try {
       const res = await fetch("/auth/activate-premium", { 
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
       });
       
       if (res.ok) {
@@ -2971,7 +2977,7 @@ async function handleReportAction(reportId, postId, action) {
   try {
     // Perform the action
     if (action === "delete") {
-      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE" });
+      const res = await fetch(`${API_URL}/posts/${postId}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) {
         showFeedback("Failed to delete post.", "error");
         return;
@@ -3215,7 +3221,8 @@ async function handleFollow(userId, button) {
 
   try {
     const res = await fetch(`/users/${userId}/follow`, {
-      method: isFollowing ? "DELETE" : "POST"
+      method: isFollowing ? "DELETE" : "POST",
+      credentials: "include"
     });
 
     if (res.ok) {
@@ -3406,7 +3413,7 @@ async function showMessages(friendId) {
   if (messagesView) messagesView.classList.remove("hidden");
   
   try {
-    const userRes = await fetch(`/auth/users/${friendId}`);
+    const userRes = await fetch(`/auth/users/${friendId}`, { credentials: "include" });
     if (userRes.ok) {
       const userData = (await userRes.json()).user;
       document.getElementById("chatUserName").textContent = userData.display_name || userData.username;
@@ -3417,7 +3424,7 @@ async function showMessages(friendId) {
   chatMessages.innerHTML = `<div style="text-align:center; color: var(--muted); padding: 20px;">Loading chat...</div>`;
   
   try {
-    const res = await fetch(`/api/messages/${friendId}`);
+    const res = await fetch(`/api/messages/${friendId}`, { credentials: "include" });
     const messages = await res.json();
     
     chatMessages.innerHTML = "";
@@ -3632,7 +3639,7 @@ async function loadFollowModalData() {
   `;
 
   try {
-    const res = await fetch(`/users/${currentFollowModalUserId}/${currentFollowModalTab}`);
+    const res = await fetch(`/users/${currentFollowModalUserId}/${currentFollowModalTab}`, { credentials: "include" });
     if (!res.ok) throw new Error("Failed to load list");
     const users = await res.json();
     renderFollowModalList(users);
@@ -3718,7 +3725,8 @@ function renderFollowModalList(users) {
 
         try {
           const res = await fetch(`/users/${user.id}/follow`, {
-            method: isFollowing ? "DELETE" : "POST"
+            method: isFollowing ? "DELETE" : "POST",
+            credentials: "include"
           });
 
           if (res.ok) {

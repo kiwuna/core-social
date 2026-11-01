@@ -1,7 +1,37 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 const db = require("../db/database");
 const { sendMessagePush } = require("./push");
+
+const { v2: cloudinary } = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_NAME || "dtfjqbkas",
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const messageImageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "core_messages",
+    format: async (req, file) => "jpg",
+    transformation: [{ width: 800, height: 800, crop: "fill" }]
+  }
+});
+
+const uploadMessageImage = multer({
+  storage: messageImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(req, file, cb) {
+    if (!file.mimetype || !file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files are allowed."));
+    }
+    cb(null, true);
+  }
+});
 
 // Fetch conversation list for logged-in user
 router.get("/conversations", async (req, res) => {
@@ -118,22 +148,23 @@ router.get("/:userId", async (req, res) => {
 });
 
 // Send a message
-router.post("/", async (req, res) => {
+router.post("/", uploadMessageImage.single("image"), async (req, res) => {
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   const { receiver_id, content } = req.body;
   const sender_id = req.session.userId;
+  const imagePath = req.file ? req.file.path : null;
 
-  if (!receiver_id || !content) {
+  if (!receiver_id || (!content && !imagePath)) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
     const result = await db.query(
-      "INSERT INTO messages (sender_id, receiver_id, content, delivered_at) VALUES ($1, $2, $3, NOW()) RETURNING *",
-      [sender_id, receiver_id, content]
+      "INSERT INTO messages (sender_id, receiver_id, content, image_path, delivered_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *",
+      [sender_id, receiver_id, content || "", imagePath]
     );
     const savedMessage = result.rows[0];
 
@@ -146,7 +177,7 @@ router.post("/", async (req, res) => {
     try {
       await sendMessagePush(db, receiver_id, {
         title: "New message",
-        body: content,
+        body: imagePath ? "📷 Sent an image" : content,
         url: `/messages/${sender_id}`,
         icon: "/assets/CoreLogo.png",
         badge: "/assets/CoreLogo.png"

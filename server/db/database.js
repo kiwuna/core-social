@@ -198,6 +198,7 @@ const initDb = async () => {
         sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
+        image_path TEXT,
         delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         seen_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -205,6 +206,7 @@ const initDb = async () => {
     `);
     await runAlter('ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL');
     await runAlter('ALTER TABLE messages ADD COLUMN IF NOT EXISTS seen_at TIMESTAMP WITH TIME ZONE DEFAULT NULL');
+    await runAlter('ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_path TEXT');
 
     // Push subscriptions table
     await pool.query(`

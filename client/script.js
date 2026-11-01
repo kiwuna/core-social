@@ -62,6 +62,46 @@ function formatNumber(num) {
   return num.toString();
 }
 
+// Upload with progress tracking
+function uploadWithProgress(url, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        const percentComplete = (e.loaded / e.total) * 100;
+        onProgress(percentComplete);
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve({ ok: true, data, status: xhr.status });
+        } catch (e) {
+          resolve({ ok: true, data: xhr.responseText, status: xhr.status });
+        }
+      } else {
+        try {
+          const error = JSON.parse(xhr.responseText);
+          reject({ ok: false, error: error.error || 'Upload failed', status: xhr.status });
+        } catch (e) {
+          reject({ ok: false, error: 'Upload failed', status: xhr.status });
+        }
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      reject({ ok: false, error: 'Network error during upload' });
+    });
+
+    xhr.open('POST', url);
+    xhr.withCredentials = true;
+    xhr.send(formData);
+  });
+}
+
 const postForm = document.getElementById("postForm");
 const postInput = document.getElementById("postInput");
 const profileView = document.getElementById("profileView");
@@ -2012,11 +2052,20 @@ if (postForm) {
         formData.append("font_style", selectedFont);
       }
 
-      const response = await fetch(`${API_URL}/posts`, {
-        method: "POST",
-        credentials: "include",
-        body: formData
-      });
+      let response;
+      if (selectedImageFile) {
+        showFeedback('Uploading post... 0%', 'info');
+        const result = await uploadWithProgress(`${API_URL}/posts`, formData, (percent) => {
+          showFeedback(`Uploading post... ${Math.round(percent)}%`, 'info');
+        });
+        response = { ok: result.ok, status: result.status, json: async () => result.data };
+      } else {
+        response = await fetch(`${API_URL}/posts`, {
+          method: "POST",
+          credentials: "include",
+          body: formData
+        });
+      }
 
       if (response.status === 401) { window.location.href = "login.html"; return; }
       if (!response.ok) throw new Error(await getErrorMessage(response, "Error"));
@@ -2722,28 +2771,26 @@ if (avatarFileInput) {
     formData.append('avatar', file);
 
     try {
-      showFeedback('Uploading avatar...', 'info');
-      const res = await fetch(`${API_URL}/auth/upload-avatar`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
+      showFeedback('Uploading avatar... 0%', 'info');
+      
+      const result = await uploadWithProgress(`${API_URL}/auth/upload-avatar`, formData, (percent) => {
+        showFeedback(`Uploading avatar... ${Math.round(percent)}%`, 'info');
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      if (result.ok) {
+        const data = result.data;
         currentUser.avatar_path = data.avatar_path;
         updateAuthUI();
-        
+
         // Update preview in settings
         if (avatarPreview) {
           avatarPreview.innerHTML = `<img src="${data.avatar_path}" />`;
         }
         if (removeAvatarBtn) removeAvatarBtn.classList.remove('hidden');
-        
+
         showFeedback('Avatar updated!', 'success');
       } else {
-        const err = await res.json();
-        showFeedback(err.error || 'Upload failed', 'error');
+        showFeedback(result.error || 'Upload failed', 'error');
       }
     } catch (err) {
       showFeedback('Error uploading avatar', 'error');
@@ -2771,26 +2818,24 @@ if (bannerFileInput) {
     formData.append('banner', file);
 
     try {
-      showFeedback('Uploading banner...', 'info');
-      
-      const res = await fetch(`${API_URL}/auth/upload-banner`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
+      showFeedback('Uploading banner... 0%', 'info');
+
+      const result = await uploadWithProgress(`${API_URL}/auth/upload-banner`, formData, (percent) => {
+        showFeedback(`Uploading banner... ${Math.round(percent)}%`, 'info');
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      if (result.ok) {
+        const data = result.data;
         currentUser.banner_path = data.banner_path;
-        
+
         // Update preview in settings
         if (bannerPreview) {
           bannerPreview.innerHTML = `<img src="${data.banner_path}?v=${Date.now()}" />`;
         }
         if (removeBannerBtn) removeBannerBtn.classList.remove('hidden');
-        
+
         showFeedback('Banner updated successfully!', 'success');
-        
+
         // Reset input so same file can be picked again
         bannerFileInput.value = '';
 
@@ -2799,8 +2844,7 @@ if (bannerFileInput) {
           MapsTo('profile/' + currentUser.id, false);
         }
       } else {
-        const err = await res.json();
-        showFeedback(err.error || 'Upload failed', 'error');
+        showFeedback(result.error || 'Upload failed', 'error');
         bannerFileInput.value = '';
       }
     } catch (err) {
@@ -3486,7 +3530,8 @@ function appendMessage(msg) {
   div.innerHTML = `
     ${shouldShowTime ? `<span style="font-size: 10px; color: var(--muted); margin: 0 0 1px; opacity: 0.7;">${messageTime}</span>` : ""}
     <div style="max-width: min(70%, 520px); padding: 10px 14px; border-radius: 18px; background: ${isMe ? '#7c3aed' : 'var(--panel)'}; color: #fff; font-size: 14px; line-height: 1.4; word-wrap: break-word;">
-      ${msg.content}
+      ${msg.image_path ? `<img src="${msg.image_path}" style="max-width: 100%; border-radius: 8px; margin-bottom: 8px;" alt="Image" />` : ""}
+      ${msg.content || ""}
     </div>
   `;
   div.__messageData = msg;

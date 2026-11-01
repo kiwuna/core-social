@@ -1,6 +1,6 @@
 const express = require("express");
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config();
 const session = require("express-session");
 const PgStore = require("connect-pg-simple")(session);
 const db = require("./db/database");
@@ -26,9 +26,23 @@ app.use((req, res, next) => {
 const PORT = Number(process.env.PORT) || 3000;
 app.locals.db = db;
 
-// Session configuration - use PostgreSQL for production, memory for local dev
+// Session configuration - disable for serverless or use memory store
 if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  // Production: Use PostgreSQL store for persistent sessions
+  // In serverless, use memory store (sessions won't persist across invocations)
+  // For production, consider using Vercel KV or Redis
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || "core-social-secret-key",
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+        httpOnly: true,
+        sameSite: "lax",
+      },
+    })
+  );
+} else {
   app.use(
     session({
       store: new PgStore({
@@ -40,22 +54,7 @@ if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
       saveUninitialized: false,
       cookie: {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false, // Vercel handles HTTPS
-      },
-    })
-  );
-} else {
-  // Local development: Use memory store (sessions reset on server restart)
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET || "core-social-secret-key",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-        httpOnly: true,
+        httpOnly: true, // Security: prevents client-side JS from reading the cookie
         sameSite: "lax",
       },
     })

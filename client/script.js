@@ -3577,29 +3577,76 @@ function markVisibleMessagesSeen() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const chatForm = document.getElementById("chatForm");
+  const chatImageInput = document.getElementById("chatImageInput");
+  const chatImageButton = document.getElementById("chatImageButton");
+  let selectedChatImage = null;
+
+  if (chatImageButton && chatImageInput) {
+    chatImageButton.addEventListener("click", () => {
+      chatImageInput.click();
+    });
+
+    chatImageInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        selectedChatImage = file;
+        chatImageButton.textContent = "✓";
+        chatImageButton.style.background = "rgba(124, 58, 237, 0.3)";
+        chatImageButton.style.color = "#a78bfa";
+      }
+    });
+  }
+
   if (chatForm) {
     chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = document.getElementById("chatInput");
       const text = input.value.trim();
-      if (!text || !currentChatUserId) return;
+      if (!text && !selectedChatImage || !currentChatUserId) return;
 
       try {
-        const res = await fetch("/api/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            receiver_id: Number(currentChatUserId),
-            content: text
-          })
-        });
-        
+        let res;
+        if (selectedChatImage) {
+          const formData = new FormData();
+          formData.append("receiver_id", Number(currentChatUserId));
+          if (text) formData.append("content", text);
+          formData.append("image", selectedChatImage);
+
+          showFeedback('Sending message... 0%', 'info');
+          const result = await uploadWithProgress("/api/messages", formData, (percent) => {
+            showFeedback(`Sending message... ${Math.round(percent)}%`, 'info');
+          });
+          res = { ok: result.ok, status: result.status, json: async () => result.data };
+
+          // Reset image selection
+          selectedChatImage = null;
+          chatImageInput.value = "";
+          if (chatImageButton) {
+            chatImageButton.textContent = "📷";
+            chatImageButton.style.background = "";
+            chatImageButton.style.color = "";
+          }
+        } else {
+          res = await fetch("/api/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              receiver_id: Number(currentChatUserId),
+              content: text
+            })
+          });
+        }
+
         if (res.ok) {
           const msg = await res.json();
           appendMessage(msg);
           scrollToBottom();
           input.value = "";
+          showFeedback('Message sent!', 'success');
+        } else {
+          const err = await res.json();
+          showFeedback(err.error || 'Failed to send message', 'error');
         }
       } catch (err) {
         console.error("Error sending message:", err);

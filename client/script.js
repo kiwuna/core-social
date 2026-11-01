@@ -62,46 +62,6 @@ function formatNumber(num) {
   return num.toString();
 }
 
-// Upload with progress tracking
-function uploadWithProgress(url, formData, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable && onProgress) {
-        const percentComplete = (e.loaded / e.total) * 100;
-        onProgress(percentComplete);
-      }
-    });
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          resolve({ ok: true, data, status: xhr.status });
-        } catch (e) {
-          resolve({ ok: true, data: xhr.responseText, status: xhr.status });
-        }
-      } else {
-        try {
-          const error = JSON.parse(xhr.responseText);
-          reject({ ok: false, error: error.error || 'Upload failed', status: xhr.status });
-        } catch (e) {
-          reject({ ok: false, error: 'Upload failed', status: xhr.status });
-        }
-      }
-    });
-
-    xhr.addEventListener('error', () => {
-      reject({ ok: false, error: 'Network error during upload' });
-    });
-
-    xhr.open('POST', url);
-    xhr.withCredentials = true;
-    xhr.send(formData);
-  });
-}
-
 const postForm = document.getElementById("postForm");
 const postInput = document.getElementById("postInput");
 const profileView = document.getElementById("profileView");
@@ -2052,20 +2012,11 @@ if (postForm) {
         formData.append("font_style", selectedFont);
       }
 
-      let response;
-      if (selectedImageFile) {
-        showFeedback('Uploading post... 0%', 'info');
-        const result = await uploadWithProgress(`${API_URL}/posts`, formData, (percent) => {
-          showFeedback(`Uploading post... ${Math.round(percent)}%`, 'info');
-        });
-        response = { ok: result.ok, status: result.status, json: async () => result.data };
-      } else {
-        response = await fetch(`${API_URL}/posts`, {
-          method: "POST",
-          credentials: "include",
-          body: formData
-        });
-      }
+      const response = await fetch(`${API_URL}/posts`, {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
 
       if (response.status === 401) { window.location.href = "login.html"; return; }
       if (!response.ok) throw new Error(await getErrorMessage(response, "Error"));
@@ -2771,14 +2722,15 @@ if (avatarFileInput) {
     formData.append('avatar', file);
 
     try {
-      showFeedback('Uploading avatar... 0%', 'info');
-      
-      const result = await uploadWithProgress(`${API_URL}/auth/upload-avatar`, formData, (percent) => {
-        showFeedback(`Uploading avatar... ${Math.round(percent)}%`, 'info');
+      showFeedback('Uploading avatar...', 'info');
+      const res = await fetch(`${API_URL}/auth/upload-avatar`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
       });
 
-      if (result.ok) {
-        const data = result.data;
+      if (res.ok) {
+        const data = await res.json();
         currentUser.avatar_path = data.avatar_path;
         updateAuthUI();
 
@@ -2790,7 +2742,8 @@ if (avatarFileInput) {
 
         showFeedback('Avatar updated!', 'success');
       } else {
-        showFeedback(result.error || 'Upload failed', 'error');
+        const err = await res.json();
+        showFeedback(err.error || 'Upload failed', 'error');
       }
     } catch (err) {
       showFeedback('Error uploading avatar', 'error');
@@ -2818,14 +2771,16 @@ if (bannerFileInput) {
     formData.append('banner', file);
 
     try {
-      showFeedback('Uploading banner... 0%', 'info');
+      showFeedback('Uploading banner...', 'info');
 
-      const result = await uploadWithProgress(`${API_URL}/auth/upload-banner`, formData, (percent) => {
-        showFeedback(`Uploading banner... ${Math.round(percent)}%`, 'info');
+      const res = await fetch(`${API_URL}/auth/upload-banner`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
       });
 
-      if (result.ok) {
-        const data = result.data;
+      if (res.ok) {
+        const data = await res.json();
         currentUser.banner_path = data.banner_path;
 
         // Update preview in settings
@@ -2844,7 +2799,8 @@ if (bannerFileInput) {
           MapsTo('profile/' + currentUser.id, false);
         }
       } else {
-        showFeedback(result.error || 'Upload failed', 'error');
+        const err = await res.json();
+        showFeedback(err.error || 'Upload failed', 'error');
         bannerFileInput.value = '';
       }
     } catch (err) {
@@ -3530,8 +3486,7 @@ function appendMessage(msg) {
   div.innerHTML = `
     ${shouldShowTime ? `<span style="font-size: 10px; color: var(--muted); margin: 0 0 1px; opacity: 0.7;">${messageTime}</span>` : ""}
     <div style="max-width: min(70%, 520px); padding: 10px 14px; border-radius: 18px; background: ${isMe ? '#7c3aed' : 'var(--panel)'}; color: #fff; font-size: 14px; line-height: 1.4; word-wrap: break-word;">
-      ${msg.image_path ? `<img src="${msg.image_path}" style="max-width: 100%; border-radius: 8px; margin-bottom: 8px;" alt="Image" />` : ""}
-      ${msg.content || ""}
+      ${msg.content}
     </div>
   `;
   div.__messageData = msg;
@@ -3577,76 +3532,29 @@ function markVisibleMessagesSeen() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const chatForm = document.getElementById("chatForm");
-  const chatImageInput = document.getElementById("chatImageInput");
-  const chatImageButton = document.getElementById("chatImageButton");
-  let selectedChatImage = null;
-
-  if (chatImageButton && chatImageInput) {
-    chatImageButton.addEventListener("click", () => {
-      chatImageInput.click();
-    });
-
-    chatImageInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        selectedChatImage = file;
-        chatImageButton.textContent = "✓";
-        chatImageButton.style.background = "rgba(124, 58, 237, 0.3)";
-        chatImageButton.style.color = "#a78bfa";
-      }
-    });
-  }
-
   if (chatForm) {
     chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = document.getElementById("chatInput");
       const text = input.value.trim();
-      if (!text && !selectedChatImage || !currentChatUserId) return;
+      if (!text || !currentChatUserId) return;
 
       try {
-        let res;
-        if (selectedChatImage) {
-          const formData = new FormData();
-          formData.append("receiver_id", Number(currentChatUserId));
-          if (text) formData.append("content", text);
-          formData.append("image", selectedChatImage);
-
-          showFeedback('Sending message... 0%', 'info');
-          const result = await uploadWithProgress("/api/messages", formData, (percent) => {
-            showFeedback(`Sending message... ${Math.round(percent)}%`, 'info');
-          });
-          res = { ok: result.ok, status: result.status, json: async () => result.data };
-
-          // Reset image selection
-          selectedChatImage = null;
-          chatImageInput.value = "";
-          if (chatImageButton) {
-            chatImageButton.textContent = "📷";
-            chatImageButton.style.background = "";
-            chatImageButton.style.color = "";
-          }
-        } else {
-          res = await fetch("/api/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              receiver_id: Number(currentChatUserId),
-              content: text
-            })
-          });
-        }
+        const res = await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            receiver_id: Number(currentChatUserId),
+            content: text
+          })
+        });
 
         if (res.ok) {
           const msg = await res.json();
           appendMessage(msg);
           scrollToBottom();
           input.value = "";
-          showFeedback('Message sent!', 'success');
-        } else {
-          const err = await res.json();
-          showFeedback(err.error || 'Failed to send message', 'error');
         }
       } catch (err) {
         console.error("Error sending message:", err);
